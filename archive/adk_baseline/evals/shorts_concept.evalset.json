@@ -1,0 +1,100 @@
+{
+  "eval_set_id": "shorts_concept_smoke",
+  "name": "Shorts concept smoke tests",
+  "description": "Golden topics for regression testing the SequentialAgent pipeline. Expected final_response text is a soft structural hint (Hook section), not a verbatim match.",
+  "eval_cases": [
+    {
+      "eval_id": "ai_agents_adk",
+      "session_input": {
+        "app_name": "youtube_shorts_app",
+        "user_id": "eval_user",
+        "state": {
+          "raw_idea": "How to build AI Agents with Google ADK"
+        }
+      },
+      "conversation": [
+        {
+          "invocation_id": "inv-1",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "How to build AI Agents with Google ADK"
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Hook"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "fastapi_di",
+      "session_input": {
+        "app_name": "youtube_shorts_app",
+        "user_id": "eval_user",
+        "state": {
+          "raw_idea": "Explain FastAPI dependency injection for beginners"
+        }
+      },
+      "conversation": [
+        {
+          "invocation_id": "inv-1",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Explain FastAPI dependency injection for beginners"
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Hook"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "eval_id": "pydantic_settings",
+      "session_input": {
+        "app_name": "youtube_shorts_app",
+        "user_id": "eval_user",
+        "state": {
+          "raw_idea": "Why use pydantic-settings for 12-factor config"
+        }
+      },
+      "conversation": [
+        {
+          "invocation_id": "inv-1",
+          "user_content": {
+            "role": "user",
+            "parts": [
+              {
+                "text": "Why use pydantic-settings for 12-factor config"
+              }
+            ]
+          },
+          "final_response": {
+            "role": "model",
+            "parts": [
+              {
+                "text": "Hook"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "title": "LangGraph state in 45 seconds",
+  "hook": "Stop losing agent context between steps.",
+  "body": "Put every field your Shorts pipeline needs into a typed WorkflowState. Nodes return partial updates; Pydantic validates the merge. That is how you stop silent key typos from breaking production agents.",
+  "cta": "Clone the typed-state pattern in your next graph.",
+  "target_audience": "developers",
+  "estimated_duration_seconds": 45.0,
+  "sections": [
+    {
+      "label": "hook",
+      "text": "Stop losing agent context between steps.",
+      "estimated_seconds": 3.0
+    },
+    {
+      "label": "body",
+      "text": "Put every field your Shorts pipeline needs into a typed WorkflowState. Nodes return partial updates; Pydantic validates the merge.",
+      "estimated_seconds": 30.0
+    },
+    {
+      "label": "cta",
+      "text": "Clone the typed-state pattern in your next graph.",
+      "estimated_seconds": 7.0
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "title": "x",
+  "hook": "Hi there!!",
+  "body": "Stuff happens.",
+  "cta": "Bye now!!",
+  "target_audience": "developers",
+  "estimated_duration_seconds": 20.0,
+  "sections": [
+    {
+      "label": "hook",
+      "text": "Hi there!!",
+      "estimated_seconds": 2.0
+    },
+    {
+      "label": "body",
+      "text": "Stuff happens.",
+      "estimated_seconds": 10.0
+    },
+    {
+      "label": "body",
+      "text": "More stuff.",
+      "estimated_seconds": 8.0
+    }
+  ]
+}
