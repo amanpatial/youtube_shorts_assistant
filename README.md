@@ -341,6 +341,8 @@ If the peer is down: degrade to empty research (log `a2a_research_degraded`) unl
 
 Non-blocking job API (no Kubernetes). `POST /shorts` returns **202** immediately; a same-repo worker claims SQL jobs and runs/resumes LangGraph.
 
+**Full endpoint + Postman guide:** [`docs/runbooks/api.md`](docs/runbooks/api.md)
+
 ```bash
 export API_KEY=dev-change-me
 export PYTHONPATH=src
@@ -351,7 +353,7 @@ python -m shorts_assistant.api --port 8000
 # Terminal 2 — worker
 python -m shorts_assistant.worker
 
-# Client
+# Client (use a unique Idempotency-Key per new run)
 curl -s -X POST http://127.0.0.1:8000/shorts \
   -H "X-API-Key: $API_KEY" \
   -H "Idempotency-Key: demo-1" \
@@ -523,7 +525,7 @@ youtube_shorts_assistant/
 ├── evals/                    # smoke + full datasets + packs/
 ├── .github/workflows/        # ci / ai-eval / nightly-eval
 ├── docker-compose.prod.yml   # migrate + api + worker (+ optional postgres)
-├── docs/runbooks/            # deploy + gtm_prototype
+├── docs/runbooks/            # api + deploy + gtm_prototype
 ├── docs/adr/                 # ADR 0001 LangGraph-only
 ├── archive/adk_baseline/     # frozen ADK experiment
 ├── docs/architecture/        # solution architecture + ADK vs LG
