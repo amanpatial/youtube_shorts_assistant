@@ -4,14 +4,14 @@ LangGraph learning project that turns a developer-focused idea into a YouTube Sh
 
 | | |
 |--|--|
-| **Version** | **0.21.0** (Phases **1–21** complete) |
+| **Version** | **0.23.0** (Phases **1–23** — live `sales_brief` pack) |
 | **Active stack** | LangGraph — [`src/shorts_assistant/`](src/shorts_assistant/) |
 | **ADK experiment** | Archived — [`archive/adk_baseline/`](archive/adk_baseline/) (not a second runtime) |
 | **ADR** | [0001 — LangGraph-only](docs/adr/0001-primary-orchestration-framework.md) |
 | **Architecture** | [`docs/architecture/solution_architecture.md`](docs/architecture/solution_architecture.md) |
 | **Phase plans** | [`docs/plans/`](docs/plans/) |
 
-## What’s built (Phases 1–21)
+## What’s built (Phases 1–23)
 
 | Phase | Focus | In the repo |
 |------:|-------|-------------|
@@ -36,8 +36,10 @@ LangGraph learning project that turns a developer-focused idea into a YouTube Sh
 | 19 | Production deploy | `Dockerfile`, `docker-compose.prod.yml`, `/healthz` `/readyz` |
 | 20 | LG parity / hardening | `graph_ops.py`, ADK→LG map, stream + state history |
 | 21 | ADR LangGraph-only | [`docs/adr/0001-…`](docs/adr/0001-primary-orchestration-framework.md) + [comparison](docs/architecture/adk_vs_langgraph.md) |
+| 22 | GTM vertical packs | `packs/` registry — Pack 0 Shorts + `sales_brief` stub |
+| 23 | Live `sales_brief` pack | Pack graph + `PACK_ID` dispatch; Shorts remains default |
 
-**Roadmap complete (Phases 1–21).** Optional next: batch code-check/commit for Phases 11–21.
+**Learning roadmap 1–21 complete; Phases 22–23 add accelerator packs.** Default `PACK_ID=youtube_shorts`.
 
 ## Pipeline
 
@@ -315,6 +317,28 @@ curl -s http://127.0.0.1:8000/shorts/<workflow_id>/result -H "X-API-Key: $API_KE
 
 HITL: `POST …/approve` and `POST …/revise` enqueue resume jobs (worker calls `resume_with_decision`).
 
+## GTM accelerator / vertical packs (Phases 22–23)
+
+Shared **core** (checkpointer, HITL pattern, API, worker, security, eval, CI) + swappable **packs**.
+
+| `PACK_ID` | Role |
+|-----------|------|
+| `youtube_shorts` | Pack 0 — **live** Shorts pipeline (**default**) |
+| `sales_brief` | **Live** brief pack — `PACK_ID=sales_brief` |
+
+```bash
+# List packs
+PYTHONPATH=src python -c "from shorts_assistant.packs import list_packs; \
+print([(p.pack_id, p.active_graph) for p in list_packs()])"
+
+# Run sales brief offline demo
+PACK_ID=sales_brief HITL_REQUIRED=false \
+  PYTHONPATH=src python -m shorts_assistant "Acme Corp — expand analytics seat"
+```
+
+Checklist for a new customer vertical: [`docs/runbooks/gtm_prototype.md`](docs/runbooks/gtm_prototype.md).  
+Template: `src/shorts_assistant/packs/_template/`.
+
 ## Stack decision (Phase 21 ADR)
 
 **Primary: LangGraph. ADK: archive reference only.**
@@ -438,6 +462,7 @@ youtube_shorts_assistant/
 │   ├── worker/               # job poller → LangGraph run/resume
 │   ├── security/             # authz, rate limit, input/output guards
 │   ├── memory/               # RAG retrieve / context / writer
+│   ├── packs/                # vertical packs (youtube_shorts, sales_brief, _template)
 │   ├── graph_ops.py          # stream + get_state / history
 │   ├── runtime_lifecycle.py  # graceful shutdown flag
 │   ├── mcp_client.py         # allowlist / timeout / degraded calls
@@ -445,14 +470,14 @@ youtube_shorts_assistant/
 │   ├── eval/                 # offline dataset runner + compare
 │   └── eval_gate/            # AI quality gate vs baseline
 ├── alembic/                  # domain migrations
-├── evals/                    # smoke + full datasets, quality_gate.yaml, baselines/
+├── evals/                    # smoke + full datasets + packs/
 ├── .github/workflows/        # ci / ai-eval / nightly-eval
 ├── docker-compose.prod.yml   # migrate + api + worker (+ optional postgres)
-├── docs/runbooks/deploy.md   # staging → promote runbook
+├── docs/runbooks/            # deploy + gtm_prototype
 ├── docs/adr/                 # ADR 0001 LangGraph-only
 ├── archive/adk_baseline/     # frozen ADK experiment
 ├── docs/architecture/        # solution architecture + ADK vs LG
-├── docs/plans/               # phases 00–21 learning roadmap
+├── docs/plans/               # phases 00–23
 ├── tests/                    # pyramid (see above)
 ├── requirements.txt
 └── requirements-dev.txt
@@ -460,8 +485,8 @@ youtube_shorts_assistant/
 
 ## Learning process
 
-Work follows an inspect → design → **approve** → implement → test loop per phase. Plans live in [`docs/plans/`](docs/plans/). Phases **1–21** are implemented locally through **0.21.0**.
+Work follows an inspect → design → **approve** → implement → test loop per phase. Plans live in [`docs/plans/`](docs/plans/). Current local version: **0.23.0**.
 
 ## Out of scope (post-roadmap)
 
-Not implemented: Kubernetes, Terraform, multi-region, SSE job streaming, LangGraph Store migration. Those are optional follow-ons — not dual-stack ADK work.
+Not implemented: Kubernetes, Terraform, multi-region, SSE streaming, LangGraph Store, CRM MCP for sales_brief. Not dual-stack ADK work.

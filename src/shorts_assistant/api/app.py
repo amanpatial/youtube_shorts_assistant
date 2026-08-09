@@ -39,7 +39,7 @@ def create_app() -> FastAPI:
     """Purpose: build the FastAPI application (uvicorn entry)."""
     app = FastAPI(
         title="YouTube Shorts Assistant API",
-        version="0.21.0",
+        version="0.23.0",
         description="Async job API with authz, rate limits, and guardrails",
         lifespan=_lifespan,
     )

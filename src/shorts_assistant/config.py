@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # Phase 19: local | staging | production (prod/staging fail-fast on boot)
     app_env: str = Field(default="local", alias="APP_ENV")
 
+    # Phase 22/23: PACK_ID selects live pack graph (default youtube_shorts)
+    pack_id: str = Field(default="youtube_shorts", alias="PACK_ID")
+
     model_name: str = Field(default="gemini-2.0-flash-001", alias="MODEL_NAME")
     # Phase 14: per-task overrides (empty → MODEL_NAME for parity)
     model_research: str = Field(default="", alias="MODEL_RESEARCH")

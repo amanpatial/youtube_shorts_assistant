@@ -1,0 +1,93 @@
+{
+  "dataset_id": "sales_brief_v1_smoke",
+  "version": "1.0",
+  "description": "5-case smoke for sales_brief pack (Phase 23). Runnable via PACK_ID=sales_brief demo invoke.",
+  "cases": [
+    {
+      "case_id": "sb_saas_expansion",
+      "input": {
+        "topic": "Acme Corp — expand existing analytics seat into full platform",
+        "audience": "AE preparing QBR",
+        "constraints": ["under 1 page", "no invented pricing"]
+      },
+      "expected_characteristics": [
+        "names the account",
+        "clear next step",
+        "pain points grounded in expansion"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 7.0,
+        "require_approved": true
+      },
+      "tags": ["expansion", "saas"]
+    },
+    {
+      "case_id": "sb_new_logo_fintech",
+      "input": {
+        "topic": "Northwind Bank — first meeting on fraud detection POC",
+        "audience": "AE + SE",
+        "constraints": ["discovery-focused", "no FUD"]
+      },
+      "expected_characteristics": [
+        "opportunity stated",
+        "discovery questions implied in next step"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 7.0,
+        "require_approved": true
+      },
+      "tags": ["new_logo", "fintech"]
+    },
+    {
+      "case_id": "sb_competitive_displace",
+      "input": {
+        "topic": "Globex — displace incumbent BI tool in marketing ops",
+        "audience": "sales engineer",
+        "constraints": ["fair comparison", "no disparagement"]
+      },
+      "expected_characteristics": [
+        "value props vs status quo",
+        "actionable next step"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 7.0,
+        "require_approved": true
+      },
+      "tags": ["competitive"]
+    },
+    {
+      "case_id": "sb_thin_context",
+      "input": {
+        "topic": "Unknown SMB — inbound demo request",
+        "audience": "SDR handoff",
+        "constraints": ["call out missing info"]
+      },
+      "expected_characteristics": [
+        "flags thin context",
+        "asks for discovery inputs"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 6.0,
+        "require_approved": false
+      },
+      "tags": ["ambiguous"]
+    },
+    {
+      "case_id": "sb_renewal_risk",
+      "input": {
+        "topic": "Initech renewal in 60 days — usage down 40%",
+        "audience": "CS + AE",
+        "constraints": ["retention tone", "concrete save plan"]
+      },
+      "expected_characteristics": [
+        "acknowledges churn risk",
+        "recommended next step is concrete"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 7.0,
+        "require_approved": true
+      },
+      "tags": ["renewal"]
+    }
+  ]
+}

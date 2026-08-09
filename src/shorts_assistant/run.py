@@ -2,6 +2,7 @@
 
 Purpose: one place that binds trace_id, persistence, checkpointer, and graph invoke.
 Phase 13: ``run_until_human`` / ``resume_with_decision`` for HITL pause/resume.
+Phase 23: ``PACK_ID`` dispatches to Shorts (default) or sales_brief pack graph.
 """
 
 from __future__ import annotations
@@ -25,12 +26,16 @@ from .observability import (
     get_trace_id,
     log_event,
 )
+from .packs import get_pack
+from .packs.sales_brief.state import BriefWorkflowState
 from .persistence.repository import WorkflowRepository
 from .persistence.session import session_scope
 from .state import WorkflowState, WorkflowStatus
 from .telemetry import setup_telemetry
 
 logger = logging.getLogger(__name__)
+
+RunResult = WorkflowState | BriefWorkflowState
 
 
 def invoke_workflow(
@@ -39,8 +44,8 @@ def invoke_workflow(
     trace_id: str | None = None,
     max_iterations: int = 3,
     persist: bool = True,
-) -> WorkflowState:
-    """Purpose: run the Shorts graph (auto-approves when HITL_REQUIRED=false)."""
+) -> RunResult:
+    """Purpose: run the pack graph selected by ``PACK_ID`` (default Shorts)."""
     return run_until_human(
         request,
         trace_id=trace_id,
@@ -55,8 +60,39 @@ def run_until_human(
     trace_id: str | None = None,
     max_iterations: int = 3,
     persist: bool = True,
+) -> RunResult:
+    """Purpose: invoke until COMPLETED/FAILED or pause at AWAITING_HUMAN.
+
+    Dispatches on ``settings.pack_id`` / ``PACK_ID``:
+    - ``youtube_shorts`` (default) → Shorts StateGraph
+    - ``sales_brief`` → pack-local brief StateGraph
+    """
+    pack = get_pack()
+    if pack.pack_id == "sales_brief":
+        from .packs.sales_brief.run import run_until_human as brief_run
+
+        return brief_run(
+            request,
+            trace_id=trace_id,
+            max_iterations=max_iterations,
+            persist=persist,
+        )
+    return _run_shorts_until_human(
+        request,
+        trace_id=trace_id,
+        max_iterations=max_iterations,
+        persist=persist,
+    )
+
+
+def _run_shorts_until_human(
+    request: str,
+    *,
+    trace_id: str | None = None,
+    max_iterations: int = 3,
+    persist: bool = True,
 ) -> WorkflowState:
-    """Purpose: invoke until COMPLETED/FAILED or pause at AWAITING_HUMAN."""
+    """Purpose: Shorts Pack 0 invoke path (unchanged behavior)."""
     configure_logging()
     setup_telemetry()
     initial = WorkflowState.initial(request, max_iterations=max_iterations)
@@ -149,8 +185,23 @@ def resume_with_decision(
     feedback: str | None = None,
     reviewer: str = "local",
     persist: bool = True,
-) -> WorkflowState:
-    """Purpose: resume a paused HITL run with approve|reject|request_changes."""
+) -> RunResult:
+    """Purpose: resume a paused HITL run with approve|reject|request_changes.
+
+    Uses the same ``PACK_ID`` as the original run (keep env consistent for resume).
+    """
+    pack = get_pack()
+    if pack.pack_id == "sales_brief":
+        from .packs.sales_brief.run import resume_with_decision as brief_resume
+
+        return brief_resume(
+            execution_id,
+            decision=decision,
+            feedback=feedback,
+            reviewer=reviewer,
+            persist=persist,
+        )
+
     configure_logging()
     setup_telemetry()
     payload = validate_decision_payload(decision, feedback)
@@ -275,6 +326,7 @@ def load_execution_state(execution_id: str) -> WorkflowState | None:
 
 # Phase 20: re-export stream / time-travel helpers for a single import surface.
 __all__ = [
+    "RunResult",
     "get_thread_state",
     "invoke_workflow",
     "list_state_history",

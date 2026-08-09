@@ -23,7 +23,7 @@ from .state import WorkflowState
 def main(argv: list[str] | None = None) -> int:
     """Purpose: parse topic, invoke traced graph, print JSON, return exit code."""
     parser = argparse.ArgumentParser(
-        description="YouTube Shorts Assistant — LangGraph (structured contracts)"
+        description="YouTube Shorts Assistant — LangGraph (PACK_ID selects pack graph)"
     )
     parser.add_argument(
         "topic",

@@ -98,8 +98,8 @@ Cursor must **not** implement the roadmap autonomously.
 | Item | Value |
 |------|--------|
 | **Framework strategy** | LangGraph-only; ADK → archive |
-| **Active phase** | Phase 21 — ADR implemented locally (0.21.0); roadmap Phases 1–21 complete |
-| **Next step** | **Batch code-check/commit Phases 11–21** (when you ask) |
+| **Active phase** | Phase 23 — Live sales_brief pack implemented locally (0.23.0) |
+| **Next step** | Inspect next accelerator phase when ready; push when workflow scope available |
 | **ADK code archived on disk?** | Yes — `archive/adk_baseline/` |
 | **Solution architecture** | [docs/architecture/solution_architecture.md](../architecture/solution_architecture.md) |
 | **Phase 6** | Complete (0.6.0) — taxonomy + scoped LLM retries |
