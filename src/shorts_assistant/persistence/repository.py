@@ -32,12 +32,35 @@ class WorkflowRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create_workflow(self, request: str) -> str:
+    def create_workflow(
+        self,
+        request: str,
+        *,
+        status: str = "CREATED",
+        owner_key_id: str | None = None,
+    ) -> str:
         """Purpose: insert a logical job row; return UUID string."""
-        row = WorkflowRow(request=request.strip(), status="CREATED")
+        row = WorkflowRow(
+            request=request.strip(),
+            status=status,
+            owner_key_id=owner_key_id,
+        )
         self.session.add(row)
         self.session.flush()
         return str(row.id)
+
+    def get_workflow(self, workflow_id: str) -> WorkflowRow | None:
+        """Purpose: load workflow by id."""
+        return self.session.get(WorkflowRow, uuid.UUID(workflow_id))
+
+    def latest_execution(self, workflow_id: str) -> ExecutionRow | None:
+        """Purpose: newest execution for a workflow (HITL / status)."""
+        return self.session.scalar(
+            select(ExecutionRow)
+            .where(ExecutionRow.workflow_id == uuid.UUID(workflow_id))
+            .order_by(ExecutionRow.started_at.desc())
+            .limit(1)
+        )
 
     def start_execution(
         self,
@@ -130,9 +153,7 @@ class WorkflowRepository:
     ) -> str:
         """Purpose: insert-only script snapshot; optionally mark as best."""
         script_payload = (
-            script.model_dump(mode="json")
-            if isinstance(script, ShortScript)
-            else dict(script)
+            script.model_dump(mode="json") if isinstance(script, ShortScript) else dict(script)
         )
         if version is None:
             existing = self.session.scalars(

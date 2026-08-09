@@ -24,8 +24,7 @@ _root_token: Any = None
 
 def _otel_requested() -> bool:
     otlp = bool(
-        os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-        or os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+        os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or os.getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
     )
     return bool(settings.enable_otel or otlp)
 
@@ -65,9 +64,7 @@ def setup_telemetry() -> None:
                     OTLPSpanExporter,
                 )
 
-                provider.add_span_processor(
-                    BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
-                )
+                provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
             except Exception as exc:  # noqa: BLE001 — fail-open
                 logger.warning("OTLP exporter setup failed: %s", exc)
         trace.set_tracer_provider(provider)

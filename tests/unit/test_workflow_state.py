@@ -28,6 +28,8 @@ def test_initial_state():
     assert state.error_node is None
     assert state.trace_id is None
     assert state.execution_id is None
+    assert state.memory_context is None
+    assert state.retrieved_memory_ids == []
 
 
 def test_initial_rejects_empty_request():

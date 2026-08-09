@@ -87,11 +87,7 @@ def synthetic_judge(
     hook_score = 9.0 if hook_len >= 24 else 7.0 if hook_len >= 12 else 4.0
     cta_score = 9.0 if cta_len >= 24 else 7.0 if cta_len >= 12 else 4.0
     clarity_score = 9.0 if body_len >= 80 else 7.0 if body_len >= 40 else 4.0
-    duration_score = (
-        9.0
-        if 20 <= script.estimated_duration_seconds <= 55
-        else 6.0
-    )
+    duration_score = 9.0 if 20 <= script.estimated_duration_seconds <= 55 else 6.0
     developer_value = 8.5 if research else 7.5
     technical_accuracy = 8.0
     factual_correctness = 7.5
@@ -138,9 +134,10 @@ def try_live_judge(
 ) -> ScriptEvaluation | None:
     """Purpose: optional Gemini structured-output judge; None if unavailable.
 
-    Uses Phase 6 ``call_with_policy`` (timeout + TRANSIENT retries). On exhaustion
-    or permanent failure: return ``None`` when ``LIVE_JUDGE_FALLBACK`` is true so
-    ``judge_script`` can use ``synthetic_judge``; otherwise re-raise.
+    Uses Phase 14 ModelRouter for evaluate-task model + availability fallbacks.
+    Phase 6 ``call_with_policy`` retries the current model on TRANSIENT errors.
+    On exhaustion of candidates: return ``None`` when ``LIVE_JUDGE_FALLBACK`` is
+    true so ``judge_script`` can use ``synthetic_judge``; otherwise re-raise.
     """
     from .failures import (
         RetriesExhaustedError,
@@ -148,6 +145,9 @@ def try_live_judge(
         classify_exception,
         llm_retry_policy_from_settings,
     )
+    from .models import TaskType, get_router
+    from .models.factory import chat_model_for_task
+    from .observability import log_event
     from .state import FailureClass
 
     try:
@@ -156,7 +156,7 @@ def try_live_judge(
         return None
 
     try:
-        from langchain_google_genai import ChatGoogleGenerativeAI
+        import langchain_google_genai  # noqa: F401
     except ImportError:
         logger.warning("langchain_google_genai not available; using synthetic judge")
         return None
@@ -174,41 +174,76 @@ def try_live_judge(
         f"## Script JSON\n{script.model_dump_json(indent=2)}\n"
     )
 
-    def _invoke() -> ScriptEvaluation:
-        llm = ChatGoogleGenerativeAI(
-            model=settings.model_name,
-            google_api_key=settings.google_api_key or None,
-        )
-        structured = llm.with_structured_output(ScriptEvaluation)
-        result = structured.invoke(user_payload)
-        if isinstance(result, ScriptEvaluation):
-            return result
-        return ScriptEvaluation.model_validate(result)
+    router = get_router(settings)
+    decision = router.resolve(TaskType.EVALUATE)
+    log_event(
+        "model_route",
+        agent="evaluator",
+        task=decision.task,
+        model=decision.model,
+        route_reason=decision.reason,
+        fallbacks=decision.fallbacks or None,
+    )
 
     policy = llm_retry_policy_from_settings(settings)
     kwargs: dict = {"policy": policy}
     if sleep is not None:
         kwargs["sleep"] = sleep
 
-    try:
-        return call_with_policy(_invoke, **kwargs)
-    except RetriesExhaustedError as exc:
-        if settings.live_judge_fallback:
-            logger.warning(
-                "Live judge retries exhausted (%s); using synthetic judge", exc
-            )
-            return None
-        raise
-    except Exception as exc:  # noqa: BLE001 — classify then fallback or propagate
-        failure_class = classify_exception(exc)
-        if settings.live_judge_fallback and failure_class != FailureClass.QUALITY:
-            logger.warning(
-                "Live judge failed class=%s (%s); using synthetic judge",
-                failure_class.value,
-                exc,
-            )
-            return None
-        raise
+    failed: set[str] = set()
+    last_error: BaseException | None = None
+
+    while True:
+        model_id = router.next_after_failure(decision, failed_models=failed)
+        if model_id is None:
+            break
+
+        def _invoke(mid: str = model_id) -> ScriptEvaluation:
+            llm = chat_model_for_task(TaskType.EVALUATE, settings=settings, model_id=mid)
+            structured = llm.with_structured_output(ScriptEvaluation)
+            result = structured.invoke(user_payload)
+            if isinstance(result, ScriptEvaluation):
+                return result
+            return ScriptEvaluation.model_validate(result)
+
+        try:
+            result = call_with_policy(_invoke, **kwargs)
+            if model_id != decision.model:
+                log_event(
+                    "model_fallback_used",
+                    agent="evaluator",
+                    task=decision.task,
+                    model=model_id,
+                    route_reason="availability",
+                    primary_model=decision.model,
+                )
+            return result
+        except RetriesExhaustedError as exc:
+            last_error = exc
+            failed.add(model_id)
+            logger.warning("Live judge exhausted on model=%s; trying next candidate", model_id)
+            continue
+        except Exception as exc:  # noqa: BLE001 — classify then try next / fallback
+            last_error = exc
+            failure_class = classify_exception(exc)
+            if failure_class == FailureClass.QUALITY:
+                raise
+            if failure_class == FailureClass.TRANSIENT:
+                failed.add(model_id)
+                continue
+            # PERMANENT / PROGRAMMING — try next model once, then synthetic
+            failed.add(model_id)
+            continue
+
+    if settings.live_judge_fallback:
+        logger.warning(
+            "Live judge all model candidates failed (%s); using synthetic judge",
+            last_error,
+        )
+        return None
+    if last_error is not None:
+        raise last_error
+    return None
 
 
 def judge_script(

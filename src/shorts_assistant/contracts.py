@@ -77,9 +77,7 @@ def guard_evaluation(
     return parse_contract(ScriptEvaluation, evaluation, agent=agent)
 
 
-def guard_visuals(
-    visuals: VisualPlan | None, *, agent: str = "visualizer"
-) -> VisualPlan:
+def guard_visuals(visuals: VisualPlan | None, *, agent: str = "visualizer") -> VisualPlan:
     """Purpose: require a valid VisualPlan before formatting the final concept.
 
     Called by: formatter.

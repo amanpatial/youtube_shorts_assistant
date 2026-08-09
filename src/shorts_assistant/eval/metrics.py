@@ -40,11 +40,7 @@ def criteria_pass(
     duration = float(script.get("estimated_duration_seconds", 999))
     if duration > criteria.max_duration_seconds:
         return False
-    labels = {
-        str(s.get("label"))
-        for s in (script.get("sections") or [])
-        if isinstance(s, dict)
-    }
+    labels = {str(s.get("label")) for s in (script.get("sections") or []) if isinstance(s, dict)}
     for required in criteria.must_include_sections:
         if required not in labels:
             return False
@@ -59,9 +55,7 @@ def case_record_from_state(
 ) -> dict[str, Any]:
     """Purpose: build one per-case result row from final WorkflowState dict."""
     evaluation = _as_dict(state.get("evaluation"))
-    script = _as_dict(state.get("generated_script")) or _as_dict(
-        state.get("best_script")
-    )
+    script = _as_dict(state.get("generated_script")) or _as_dict(state.get("best_script"))
     status = state.get("status")
     if hasattr(status, "value"):
         status = status.value
@@ -110,17 +104,11 @@ def aggregate_metrics(case_records: list[dict[str, Any]]) -> dict[str, Any]:
     """Purpose: summary metrics over per-case records."""
     n = len(case_records)
     with_eval = [
-        r
-        for r in case_records
-        if r.get("overall_score") is not None and not r.get("failed")
+        r for r in case_records if r.get("overall_score") is not None and not r.get("failed")
     ]
     overalls = [float(r["overall_score"]) for r in with_eval]
     hooks = [float(r["hook_score"]) for r in with_eval if r.get("hook_score") is not None]
-    clarity = [
-        float(r["clarity_score"])
-        for r in with_eval
-        if r.get("clarity_score") is not None
-    ]
+    clarity = [float(r["clarity_score"]) for r in with_eval if r.get("clarity_score") is not None]
     accuracy_parts: list[float] = []
     for r in with_eval:
         ta = r.get("technical_accuracy")

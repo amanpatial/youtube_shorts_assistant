@@ -39,10 +39,7 @@ def test_poor_script_deterministic_hard_fail():
     det = deterministic_checks(script)
     assert any(i.hard_fail for i in det)
     messages = " ".join(i.message for i in det)
-    assert any(
-        key in messages
-        for key in ("hook too short", "cta too short", "body too short")
-    )
+    assert any(key in messages for key in ("hook too short", "cta too short", "body too short"))
     assert "missing required label 'cta'" in messages
 
     generous = ScriptEvaluation(

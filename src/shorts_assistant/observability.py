@@ -27,9 +27,7 @@ _logging_configured = False
 T = TypeVar("T")
 NodeFn = Callable[[Any], dict[str, Any]]
 
-_KEY_ASSIGN_RE = re.compile(
-    r"(?i)(api[_-]?key|token|secret|password|GOOGLE_API_KEY)\s*[:=]\s*\S+"
-)
+_KEY_ASSIGN_RE = re.compile(r"(?i)(api[_-]?key|token|secret|password|GOOGLE_API_KEY)\s*[:=]\s*\S+")
 _SK_RE = re.compile(r"sk-[A-Za-z0-9]{10,}")
 _AIZA_RE = re.compile(r"AIza[0-9A-Za-z_-]{20,}")
 
@@ -49,12 +47,8 @@ def estimate_cost_usd(
     """Purpose: rough USD estimate from token counts (not a billing API)."""
     if input_tokens is None and output_tokens is None:
         return None
-    in_rate = (
-        settings.cost_per_1m_input_usd if input_rate is None else input_rate
-    )
-    out_rate = (
-        settings.cost_per_1m_output_usd if output_rate is None else output_rate
-    )
+    in_rate = settings.cost_per_1m_input_usd if input_rate is None else input_rate
+    out_rate = settings.cost_per_1m_output_usd if output_rate is None else output_rate
     inp = float(input_tokens or 0)
     out = float(output_tokens or 0)
     return round((inp * in_rate + out * out_rate) / 1_000_000.0, 8)
@@ -73,6 +67,7 @@ def redact_text(text: str, *, limit: int | None = None) -> str:
     if limit is not None and len(cleaned) > limit:
         return cleaned[: limit - 3] + "..."
     return cleaned
+
 
 class _TraceIdFilter(logging.Filter):
     """Purpose: inject trace_id onto every LogRecord in this process."""
@@ -179,6 +174,8 @@ def observe_node(name: str, fn: NodeFn) -> NodeFn:
     """Purpose: wrap a LangGraph node with timing + structured end event."""
 
     def wrapped(state: Any) -> dict[str, Any]:
+        from langgraph.errors import GraphInterrupt
+
         started = time.perf_counter()
         error: str | None = None
         update: dict[str, Any] = {}
@@ -186,6 +183,9 @@ def observe_node(name: str, fn: NodeFn) -> NodeFn:
             try:
                 update = fn(state) or {}
                 return update
+            except GraphInterrupt:
+                # HITL pause — control flow, not a node failure
+                raise
             except Exception as exc:  # noqa: BLE001 — record then re-raise
                 error = safe_error_message(exc)
                 raise
@@ -215,12 +215,17 @@ def observe_node(name: str, fn: NodeFn) -> NodeFn:
 
 @contextmanager
 def _node_span(name: str) -> Iterator[None]:
+    """Purpose: optional OTel span; must not swallow GraphInterrupt (HITL)."""
+    from contextlib import nullcontext
+
+    span_cm: Any = nullcontext()
     try:
         from .telemetry import node_span
 
-        with node_span(name):
-            yield
-    except Exception:  # noqa: BLE001 — fail-open
+        span_cm = node_span(name)
+    except Exception:  # noqa: BLE001 — fail-open without span
+        span_cm = nullcontext()
+    with span_cm:
         yield
 
 

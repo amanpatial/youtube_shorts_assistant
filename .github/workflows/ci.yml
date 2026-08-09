@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Ruff format
+        run: ruff format --check src tests
+
+      - name: Ruff lint
+        run: ruff check src tests
+
+      - name: Pyright
+        run: pyright
+
+      - name: Pytest (no live LLM / A2A)
+        env:
+          GOOGLE_API_KEY: test-not-used
+          GOOGLE_GENAI_USE_VERTEXAI: "FALSE"
+        run: pytest -q -m "not llm and not a2a"
+
+      - name: pip-audit
+        run: pip-audit -r requirements.txt -r requirements-dev.txt
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

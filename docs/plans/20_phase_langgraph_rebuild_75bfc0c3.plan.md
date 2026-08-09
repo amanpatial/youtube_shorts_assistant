@@ -1,22 +1,22 @@
 ---
 name: Phase 20 LangGraph Rebuild
-overview: "Phase 20: LangGraph parity/hardening (ADK already archived). Concept map ADK→LG for learning only; deepen LG state/loop/HITL/obs. Not a second live stack; no 20/80 dual maintenance."
+overview: "Phase 20 hardens the existing LangGraph shorts_assistant (not a rebuild). Ship ADK→LG learning map, streaming + time-travel helpers/tests, doc topology alignment; keep custom memory (no dual Store rewrite). Target 0.20.0."
 todos:
   - id: p20-map
-    content: Write ADK→LangGraph concept map and comparison (state, agents, tools, edges, loops, HITL, MCP, A2A, obs, tests)
-    status: pending
-  - id: p20-state-graph
-    content: "Create langgraph_shorts package: ShortsState, quality_gate conditional loop, best-version tracking"
-    status: pending
-  - id: p20-nodes
-    content: Implement research/script/eval/visual/format nodes with structured outputs + retries + obs
-    status: pending
-  - id: p20-hitl-checkpoint
-    content: Add checkpointer + HITL interrupt/resume path
-    status: pending
-  - id: p20-tests-docs
-    content: LangGraph loop/termination tests; README notes LangGraph-only; ADK already archived
-    status: pending
+    content: Publish ADK→LangGraph concept map under docs/architecture (learning only; ADK stays archive)
+    status: completed
+  - id: p20-stream-timetravel
+    content: Add stream + get_state/get_state_history helpers + unit/workflow tests (no SSE API required)
+    status: completed
+  - id: p20-docs-align
+    content: Align solution_architecture HITL order with graph.py; sync pyproject version; README Phase 20 notes
+    status: completed
+  - id: p20-optional-store
+    content: Document Store API vs custom memory decision (keep SQL memory; no forced PostgresStore migration)
+    status: completed
+  - id: p20-tests
+    content: Tests for stream events / state history / loop still terminates; version 0.20.0
+    status: completed
 isProject: false
 ---
 
@@ -30,13 +30,63 @@ isProject: false
 
 ## Scope lock
 
-- **Purpose:** deepen LangGraph implementation + document ADK→LG concept map for learning  
-- **ADK:** already in `archive/adk_baseline/` per master decision — do not revive as active runtime  
-- **Active stack:** LangGraph only  
-- Package: primary app is LangGraph (name TBD in Phase 1 skeleton)  
-- Same **functional** requirements listed by you  
-- Shared contracts where practical (`schemas`, eval dataset)—not shared orchestrators  
-- Do not introduce K8s; local runnable graph + API/worker migrate to LG in later phases  
+- **Purpose:** harden the **existing** `shorts_assistant` LangGraph app + document ADK→LG concept map for learning  
+- **ADK:** already in `archive/adk_baseline/` — do not revive; do **not** create a second package (`langgraph_shorts/`)  
+- **Not a rebuild:** nodes, quality loop, HITL, checkpointer, MCP/A2A, API/worker already shipped (Phases 2–19)  
+- Do not introduce K8s; do not force LangGraph Store API migration this phase  
+
+**Status:** Implemented locally as **0.20.0** (2026-08-05). Uncommitted until batch check (Phases 11–21).  
+**Commit policy:** batch code-check/commit for Phases 11–21 later (no commit until you ask).
+
+## Inspect findings (2026-08-05)
+
+| Area | Finding |
+|------|---------|
+| Plan body / todos | Still a **rebuild checklist** (`langgraph_shorts/`, implement nodes from scratch) — **outdated** vs code |
+| Graph | **Done** in `graph.py`: research → memory → script ↔ eval ↔ gate → human_review → visual → format |
+| HITL + checkpointer | **Done** (`interrupt` / `Command(resume=…)`, Memory/Postgres saver) |
+| Streaming | **Missing** — only `graph.invoke`; no `astream` / `stream_mode` helpers |
+| Time-travel | **Missing** — no `get_state` / `get_state_history` usage or tests |
+| Subgraphs | **Missing** — flat graph; A2A/MCP are in-node (acceptable; optional later) |
+| Store API | **Not used** — Phase 11 custom SQLAlchemy memory (JSON embeddings); keep for this phase |
+| Architecture docs | **Stale**: `solution_architecture.md` shows HITL *after* formatter; code has HITL *before* visualizer |
+| ADK in `src/` | Comments / deprecated `SESSION_DB_URL` only — no ADK runtime |
+| Version skew | App `__version__` = **0.19.0**; `pyproject.toml` still `0.1.0` |
+| Functional checklist in old plan | Already met by Phases 2–13+ |
+
+### What already exists (do not rebuild)
+
+- Typed `WorkflowState`, quality loop, structured schemas, retries, obs  
+- Checkpointer + HITL interrupt/resume + approve CLI/API  
+- Memory/RAG, MCP, A2A, model router, async API/worker, security, CI, deploy  
+
+### Gaps this phase must close
+
+1. **Teaching doc:** `docs/architecture/adk_to_langgraph.md` — ADK→LG map + “do not blindly translate” (keep tables below; trim rebuild package layout)  
+2. **Streaming helper:** e.g. `run.stream_workflow` / `graph_ops.stream_events` wrapping `graph.stream` (updates or values) for CLI/learning  
+3. **Time-travel helper:** `get_thread_state` / `list_state_history` over checkpointer + small CLI or module API  
+4. **Tests:** stream yields node transitions; history non-empty after invoke; loop termination still green  
+5. **Docs align:** fix architecture HITL order; README Phase 20; sync `pyproject.toml` version to **0.20.0**  
+6. **Decision note:** LangGraph Store vs custom memory — **keep custom memory**; document why (CI SQLite, already shipped)  
+7. **Out of scope:** SSE job API, AsyncPostgresSaver rewrite, subgraphs for A2A, reviving ADK, new package  
+
+### Concrete design (for Approve)
+
+```text
+docs/architecture/adk_to_langgraph.md   # learning map (from this plan’s tables)
+src/shorts_assistant/graph_ops.py       # stream_workflow, get_thread_state, list_state_history
+src/shorts_assistant/run.py             # thin wrappers / CLI flags optional
+tests/workflow/test_stream_and_history.py
+docs/architecture/solution_architecture.md  # HITL before visualizer
+```
+
+| API | Behavior |
+|-----|----------|
+| `stream_workflow(topic, …)` | `graph.stream(..., stream_mode="updates")` → list/iterator of `{node: delta}` |
+| `get_thread_state(thread_id)` | `graph.get_state(config)` |
+| `list_state_history(thread_id, limit=N)` | `graph.get_state_history(config)` |
+
+No new HTTP streaming endpoint required (Phase 16 jobs remain request/response). Optional: `python -m shorts_assistant … --stream` if CLI already exists and is cheap.
 
 ---
 
@@ -118,74 +168,57 @@ Structured outputs: parse to existing `ShortScript` / `ScriptEvaluation` / `Visu
 
 ---
 
-## Package layout (primary LangGraph app)
+## Package layout (current — do not fork)
 
-```text
-langgraph_shorts/
-  state.py
-  graph.py          # StateGraph compile
-  nodes/
-    research.py
-    scriptwriter.py
-    evaluator.py
-    quality_gate.py
-    visualizer.py
-    formatter.py
-  routing.py        # model choice (mirror Phase 14 ideas)
-  resilience.py     # retry wrappers
-  observability.py
-  cli.py
-tests_langgraph/
-  test_gate_graph.py
-  test_loop_termination.py
-```
+Active app is already [`src/shorts_assistant/`](../../src/shorts_assistant/). ADK lives only under `archive/adk_baseline/`.
 
-Active package is the LangGraph app (name from Phase 1 skeleton); ADK lives only under `archive/adk_baseline/`.
+Phase 20 **adds** `graph_ops.py` + teaching doc; it does **not** create `langgraph_shorts/`.
 
 ---
 
-## Functional parity checklist
+## Functional parity checklist (status after Inspect)
 
-| Requirement | LG approach |
-|-------------|-------------|
-| Explicit state | `ShortsState` TypedDict/Pydantic |
-| Scriptwriter / Evaluator | nodes + structured parse |
-| Quality gate / loop / best / terminate | gate node + conditional edges |
-| Visualizer / Formatter | nodes after pass |
-| Retry | tenacity around model calls in nodes |
-| Observability | workflow_id + node logs |
-| Evaluation | eval_runner invokes LangGraph graph (sole backend) |
+| Requirement | Status |
+|-------------|--------|
+| Explicit state | Done — `WorkflowState` |
+| Scriptwriter / Evaluator | Done — nodes + schemas |
+| Quality gate / loop / best / terminate | Done — Phase 5 |
+| Visualizer / Formatter | Done — after HITL approve |
+| Retry / observability / eval | Done — Phases 6–9 / 8 |
+| HITL + checkpointer | Done — Phases 10 / 13 |
+| Streaming + time-travel helpers | **Phase 20** |
+| ADK→LG learning map | **Phase 20** |
+| Architecture doc topology match | **Phase 20** |
 
 ---
 
 ## Implementation order (after approval)
 
-1. Publish ADK↔LG mapping table (teach)  
-2. Define `ShortsState` + compile empty graph with gate logic ported from pure `apply_quality_gate`  
-3. Implement nodes with structured outputs (Gemini via `langchain-google-genai` or google-genai SDK)  
-4. Add checkpointer (SQLite) + HITL interrupt  
-5. CLI invoke parity smoke  
-6. Port/adapt loop tests to `graph.invoke`  
-7. Document architectural differences essay in `langgraph_shorts/README.md`  
-8. Confirm ADK remains archive-only (not revived)  
-9. Document LangGraph as the sole production path  
+1. Publish `docs/architecture/adk_to_langgraph.md` from the teaching tables above  
+2. Add `graph_ops.py` (stream + get_state + history) wired to compiled graph/checkpointer  
+3. Tests for stream updates + non-empty history after a demo invoke  
+4. Align `solution_architecture.md` HITL order with `graph.py`  
+5. Document Store-vs-custom-memory decision (keep custom)  
+6. Bump to **0.20.0** (`__init__`, API, smoke test, `pyproject.toml`)  
+7. Confirm ADK remains archive-only  
 
 ---
 
 ## What NOT to do
 
+- Rebuild nodes into a second package  
 - Revive ADK as an active runtime  
-- Force every historical ADK class to a LangGraph class of the same name  
-- Feature-race archive ADK and LangGraph (violates LangGraph-only)  
-- Rewrite MCP/A2A fully before core loop works—stub research node first, add MCP later  
+- Force LangGraph Store / PostgresStore migration  
+- Require SSE/WebSocket job streaming in the API  
+- Rewrite async checkpointer stack unless trivial  
 - Claim “LG is always better”—document trade-offs honestly  
 
 ---
 
 ## Exit criteria
 
-- Mapping + comparison documented  
-- LangGraph app meets functional checklist as the sole primary  
-- ADK remains archive-only (not a live baseline)  
-- Tests for gate/loop/termination on LG graph  
-- Clear write-up of architectural differences + LangGraph-only allocation
+- ADK→LG mapping documented under `docs/architecture/`  
+- Stream + state-history helpers exist with tests  
+- Architecture docs match real topology (HITL before visualizer)  
+- Custom memory retained with explicit Store decision note  
+- Version **0.20.0**; ADK still archive-only  

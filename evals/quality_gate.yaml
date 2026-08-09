@@ -1,0 +1,7 @@
+# Phase 18 — merge quality gate vs frozen baseline (candidate − baseline).
+# Updating the baseline is an explicit PR; CI must not overwrite it.
+
+min_pass_rate_delta: -0.05       # allow at most −5pp vs baseline
+min_average_quality_delta: -0.3  # allow at most −0.3 overall score
+max_failure_rate: 0.15           # absolute cap on candidate failure_rate
+max_failure_rate_delta: 0.05     # allow at most +5pp failure_rate vs baseline

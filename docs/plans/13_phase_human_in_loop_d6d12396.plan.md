@@ -4,22 +4,22 @@ overview: "Phase 13 adds human approval after the quality gate—Approve / Rejec
 todos:
   - id: p13-teach
     content: Explain HITL importance; publish state machine for approve/reject/request_changes
-    status: pending
+    status: completed
   - id: p13-state
     content: Add human_decision/feedback/reviewer/reviewed_at + AWAITING_HUMAN status; persist checkpoint
-    status: pending
+    status: completed
   - id: p13-runner
     content: "Split run_until_human + resume_with_decision (LG interrupt/resume); max_human_rounds; HITL_REQUIRED flag"
-    status: pending
+    status: completed
   - id: p13-cli
     content: Add approve CLI (optional thin HTTP in same process)
-    status: pending
+    status: completed
   - id: p13-tests
     content: "Tests: pause on AI pass, approve continues, reject/changes revise, feedback required"
-    status: pending
+    status: completed
   - id: p13-docs
     content: Document interactive vs HITL_REQUIRED=false for automated evals
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -39,6 +39,51 @@ isProject: false
 - Do **not** build a full product UI/SSO; a CLI (and optional minimal HTTP endpoint in the same app) is enough
 - Depends on: quality loop, `WorkflowState`, persistence/checkpointer (Phase 10) for durable pause/resume
 - Prefer native LG `interrupt()` / `Command(resume=...)` over app-only pause when practical
+
+**Status:** Implemented locally as **0.13.0** (2026-08-05). Uncommitted until you ask.  
+**Commit policy:** no git commit until you ask to commit (Phases 11–13 may ship together).
+
+## Inspect findings (2026-08-05)
+
+| Area | Finding |
+|------|---------|
+| `interrupt` / `Command` | Available in installed LangGraph (`langgraph.types`) — unused |
+| Graph | Gate `continue` → **visualizer** directly; no human node |
+| State | No `AWAITING_HUMAN` / `APPROVED`; no `human_*` fields |
+| Runner | Single `invoke_workflow` → always runs to COMPLETED/FAILED |
+| Approve CLI | **Missing** |
+| Config | No `HITL_REQUIRED` / `MAX_HUMAN_ROUNDS` |
+| Checkpointer | Phase 10 `thread_id=execution_id` ready for resume |
+| Visualizer | Accepts only `PASSED` / `EXHAUSTED` today — must also accept `APPROVED` |
+| Eval / CI | Must keep `HITL_REQUIRED=false` (or default false) so offline suite does not hang |
+
+### What already exists (reuse)
+
+- Quality gate PASS/EXHAUSTED routing  
+- Durable checkpoint + `load_execution_state`  
+- Scriptwriter revision path via `evaluation.issues` (extend with `human_feedback`)  
+- Obs `trace_id` / `execution_id` for audit logs  
+
+### Gaps this phase must close
+
+1. State statuses + human fields + optional `human_reviews` audit table  
+2. `human_review` node with `interrupt()` between gate and visualizer  
+3. `run_until_human` + `resume_with_decision` (`Command(resume=...)`)  
+4. `python -m shorts_assistant.approve` CLI  
+5. `HITL_REQUIRED` (default **false** for CI/eval; document enabling for interactive) + `max_human_rounds=2`  
+6. Tests without live LLM  
+
+### Concrete design (for Approve)
+
+```text
+quality_gate --continue--> human_review --approve--> visualizer → formatter
+                         \--reject|request_changes--> scriptwriter (if human rounds left)
+```
+
+- When `HITL_REQUIRED=false`: human_review auto-approves (no interrupt)  
+- When true: `interrupt({preview…})` → CLI resumes with decision payload  
+- Target package version **0.13.0**  
+- Obs field name: use **`trace_id`** (not legacy `workflow_id` in plan prose)
 
 ---
 
@@ -85,7 +130,7 @@ stateDiagram-v2
 | AWAITING_HUMAN | `request_changes` | Generating | `human_decision=request_changes`, `human_feedback` **required** |
 | Generating | after human revise | Evaluating… | `human_feedback` visible to Scriptwriter |
 
-**Policy default:** Human gate runs when AI gate would proceed to visuals (PASS or EXHAUSTED). Optional config `HITL_REQUIRED=true` (default true for learning/prod-like path); `false` skips for automated evals.
+**Policy default (updated after inspect):** Human gate runs when AI gate would proceed to visuals (PASS or EXHAUSTED) **only if** `HITL_REQUIRED=true`. Default **`false`** so CI/eval/`python -m shorts_assistant` never hang on interrupt; set `true` for interactive approve CLI demos.
 
 ---
 
@@ -194,4 +239,12 @@ No live LLM required if gate/resume are unit-tested with fixtures.
 - Human feedback in workflow state  
 - Smallest useful approve/reject/request_changes path works  
 - Continue vs revise behaviors correct  
-- Importance of HITL explained in docs/wrap-up
+- Importance of HITL explained in docs/wrap-up  
+- Offline tests green with `HITL_REQUIRED=false`  
+
+## Approval gate
+
+Implement only after explicit:
+
+- “Approve Phase 13 design — implement”  
+- or “Approved, proceed with implementation”

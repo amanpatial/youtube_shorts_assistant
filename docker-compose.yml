@@ -1,17 +1,6 @@
-services:
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      SESSION_DB_URL: sqlite+aiosqlite:////app/youtube_shorts_assistant/data/sessions.db
-      LOG_LEVEL: INFO
-    volumes:
-      - shorts-data:/app/youtube_shorts_assistant/data
-    # Interactive web UI by default. For one-shot CLI:
-    # docker compose run --rm app python -m youtube_shorts_assistant "Your topic"
+# Local convenience wrapper around the production-shaped Compose file.
+# Prefer: docker compose --profile local-db up --build
+# Or:     docker compose -f docker-compose.prod.yml --profile local-db up --build
 
-volumes:
-  shorts-data:
+include:
+  - path: docker-compose.prod.yml

@@ -1,0 +1,177 @@
+{
+  "dataset_id": "shorts_v1_smoke",
+  "version": "1.0",
+  "description": "5-case PR smoke subset of shorts_v1 (Phase 18 CI): happy, howto, hype/reject, ambiguous, narrow.",
+  "cases": [
+    {
+      "case_id": "fw_langgraph_intro",
+      "input": {
+        "topic": "How to build AI agents with LangGraph",
+        "audience": "developers",
+        "constraints": [
+          "under 60 seconds",
+          "no hype"
+        ]
+      },
+      "expected_characteristics": [
+        "mentions LangGraph or graph/state concepts",
+        "clear hook in first lines",
+        "explicit CTA"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 7.0,
+        "require_approved": true,
+        "max_duration_seconds": 60,
+        "must_include_sections": [
+          "hook",
+          "body",
+          "cta"
+        ]
+      },
+      "known_failure_patterns": [
+        "generic AI hype without orchestration specifics",
+        "missing CTA",
+        "overlong duration estimate"
+      ],
+      "tags": [
+        "framework",
+        "intro",
+        "langgraph"
+      ]
+    },
+    {
+      "case_id": "howto_ci_smoke",
+      "input": {
+        "topic": "A minimal CI smoke test job every PR should run",
+        "audience": "developers",
+        "constraints": [
+          "under 60 seconds",
+          "practical"
+        ]
+      },
+      "expected_characteristics": [
+        "mentions lint or tests in CI",
+        "keeps scope small",
+        "explicit CTA"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 7.0,
+        "require_approved": true,
+        "max_duration_seconds": 60,
+        "must_include_sections": [
+          "hook",
+          "body",
+          "cta"
+        ]
+      },
+      "known_failure_patterns": [
+        "full CD platform pitch",
+        "missing CTA"
+      ],
+      "tags": [
+        "howto",
+        "ci"
+      ]
+    },
+    {
+      "case_id": "hype_ai_agents",
+      "input": {
+        "topic": "AI agents are everywhere \u2014 what actually matters for shipping",
+        "audience": "developers",
+        "constraints": [
+          "under 60 seconds",
+          "no hype"
+        ]
+      },
+      "expected_characteristics": [
+        "grounds agents in state/tools/evals",
+        "anti-hype tone",
+        "explicit CTA"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 7.0,
+        "require_approved": true,
+        "max_duration_seconds": 60,
+        "must_include_sections": [
+          "hook",
+          "body",
+          "cta"
+        ]
+      },
+      "known_failure_patterns": [
+        "10x AGI fluff",
+        "no concrete practice"
+      ],
+      "tags": [
+        "hype",
+        "agents"
+      ]
+    },
+    {
+      "case_id": "ambig_make_it_better",
+      "input": {
+        "topic": "Make it better",
+        "audience": "developers",
+        "constraints": [
+          "under 60 seconds"
+        ]
+      },
+      "expected_characteristics": [
+        "picks a concrete interpretation",
+        "still produces hook/body/CTA",
+        "acknowledges ambiguity lightly"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 6.0,
+        "require_approved": false,
+        "max_duration_seconds": 60,
+        "must_include_sections": [
+          "hook",
+          "body",
+          "cta"
+        ]
+      },
+      "known_failure_patterns": [
+        "empty generic advice",
+        "no structure"
+      ],
+      "tags": [
+        "ambiguous",
+        "robustness"
+      ]
+    },
+    {
+      "case_id": "narrow_pydantic_settings",
+      "input": {
+        "topic": "Why pydantic-settings beats raw os.environ for app config",
+        "audience": "developers",
+        "constraints": [
+          "under 60 seconds"
+        ]
+      },
+      "expected_characteristics": [
+        "names pydantic-settings or typed settings",
+        "one validation benefit",
+        "explicit CTA"
+      ],
+      "quality_criteria": {
+        "min_overall_score": 7.0,
+        "require_approved": true,
+        "max_duration_seconds": 60,
+        "must_include_sections": [
+          "hook",
+          "body",
+          "cta"
+        ]
+      },
+      "known_failure_patterns": [
+        "generic dotenv only",
+        "missing CTA"
+      ],
+      "tags": [
+        "narrow",
+        "pydantic"
+      ]
+    }
+  ]
+}

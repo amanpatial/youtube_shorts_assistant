@@ -33,9 +33,7 @@ def get_checkpointer():
             from langgraph.checkpoint.postgres import PostgresSaver
 
             url = (
-                settings.checkpoint_postgres_url
-                or settings.database_url
-                or settings.session_db_url
+                settings.checkpoint_postgres_url or settings.database_url or settings.session_db_url
             )
             if not url or url.startswith("sqlite"):
                 raise ValueError(

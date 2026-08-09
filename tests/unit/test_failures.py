@@ -62,9 +62,7 @@ def test_call_with_policy_succeeds_on_second_attempt():
     sleeps: list[float] = []
     result = call_with_policy(
         flaky,
-        policy=RetryPolicy(
-            max_attempts=3, timeout_seconds=5.0, backoff_base_seconds=0.1
-        ),
+        policy=RetryPolicy(max_attempts=3, timeout_seconds=5.0, backoff_base_seconds=0.1),
         sleep=sleeps.append,
     )
     assert result == "ok"
@@ -153,9 +151,7 @@ def test_live_judge_retries_then_success(monkeypatch):
         lambda **_kwargs: _LLM(),
     )
 
-    result = try_live_judge(
-        demo_script("topic"), "topic", sleep=lambda _d: None
-    )
+    result = try_live_judge(demo_script("topic"), "topic", sleep=lambda _d: None)
     assert result is not None
     assert result.summary == "live ok"
     assert attempts["n"] == 2
@@ -180,6 +176,59 @@ def test_live_judge_exhausted_falls_back(monkeypatch):
     )
 
     assert try_live_judge(demo_script("topic"), "topic", sleep=lambda _d: None) is None
+
+
+def test_live_judge_availability_fallback_model(monkeypatch):
+    """Primary model permanently fails → try MODEL_FALLBACK once."""
+    from shorts_assistant import judge as judge_mod
+
+    _patch_live_settings(monkeypatch, judge_mod, max_attempts=1)
+    monkeypatch.setattr(judge_mod.settings, "model_evaluate", "primary-model")
+    monkeypatch.setattr(judge_mod.settings, "model_fallback", "fallback-model")
+    monkeypatch.setattr(judge_mod.settings, "model_name", "fallback-model")
+
+    seen: list[str] = []
+    good = ScriptEvaluation(
+        overall_score=8.0,
+        hook_score=8.0,
+        clarity_score=8.0,
+        pacing_score=8.0,
+        technical_accuracy=8.0,
+        factual_correctness=8.0,
+        developer_value=8.0,
+        duration_score=8.0,
+        cta_score=8.0,
+        tone_score=8.0,
+        approved=True,
+        summary="fallback ok",
+    )
+
+    class _Structured:
+        def __init__(self, model: str) -> None:
+            self.model = model
+
+        def invoke(self, _payload: str) -> ScriptEvaluation:
+            seen.append(self.model)
+            if self.model == "primary-model":
+                raise _HttpError(401, "primary dead")
+            return good
+
+    class _LLM:
+        def __init__(self, **kwargs) -> None:
+            self.model = kwargs.get("model", "")
+
+        def with_structured_output(self, _model):
+            return _Structured(self.model)
+
+    monkeypatch.setattr(
+        "langchain_google_genai.ChatGoogleGenerativeAI",
+        _LLM,
+    )
+
+    result = try_live_judge(demo_script("topic"), "topic", sleep=lambda _d: None)
+    assert result is not None
+    assert result.summary == "fallback ok"
+    assert seen == ["primary-model", "fallback-model"]
 
 
 def test_node_boundary_uncaught_maps_to_failed(monkeypatch):

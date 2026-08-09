@@ -126,9 +126,7 @@ class ScriptVisualRow(BaseModel):
     Written as part of: ``ShortConcept.script_and_visuals``.
     """
 
-    timestamp_or_beat: str = Field(
-        description="Time range or beat label, e.g. '0-3s' or 'Hook'."
-    )
+    timestamp_or_beat: str = Field(description="Time range or beat label, e.g. '0-3s' or 'Hook'.")
     spoken_line: str = Field(description="Narration or spoken line for this beat.")
     visual: str = Field(description="Visual direction that supports this beat.")
 
@@ -147,9 +145,7 @@ class ShortConcept(BaseModel):
     script_and_visuals: list[ScriptVisualRow] = Field(
         description="Ordered script beats paired with visuals."
     )
-    visual_notes: str = Field(
-        description="Pacing, on-screen text/graphics, and B-roll guidance."
-    )
+    visual_notes: str = Field(description="Pacing, on-screen text/graphics, and B-roll guidance.")
     cta: str = Field(description="Call to action for the viewer.")
     quality_notes: str | None = Field(
         default=None,
@@ -170,9 +166,7 @@ class ShortConcept(BaseModel):
             "| --- | --- | --- |",
         ]
         for row in self.script_and_visuals:
-            lines.append(
-                f"| {row.timestamp_or_beat} | {row.spoken_line} | {row.visual} |"
-            )
+            lines.append(f"| {row.timestamp_or_beat} | {row.spoken_line} | {row.visual} |")
         lines.extend(
             [
                 "",

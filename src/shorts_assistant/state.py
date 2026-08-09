@@ -6,12 +6,15 @@ LangGraph passes this object between nodes; each node returns a partial update.
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field, field_validator
 
 from .schemas import ScriptEvaluation, ShortConcept, ShortScript, VisualPlan
+
+HumanDecision = Literal["approve", "reject", "request_changes"]
 
 
 class FailureClass(StrEnum):
@@ -44,6 +47,8 @@ class WorkflowStatus(StrEnum):
     EVALUATING = "EVALUATING"
     PASSED = "PASSED"
     EXHAUSTED = "EXHAUSTED"
+    AWAITING_HUMAN = "AWAITING_HUMAN"
+    APPROVED = "APPROVED"
     VISUALIZING = "VISUALIZING"
     FORMATTING = "FORMATTING"
     COMPLETED = "COMPLETED"
@@ -68,6 +73,9 @@ class WorkflowState(BaseModel):
       status / error*        → whichever node last updated (Phase 6 adds class/node)
       trace_id               → invoke_workflow / observability (Phase 9/10)
       execution_id           → persistence execution UUID (Phase 10)
+      memory_context         → memory_retrieve_node (Phase 11)
+      retrieved_memory_ids   → memory_retrieve_node (Phase 11)
+      human_*                → human_review_node / approve CLI (Phase 13)
     """
 
     request: str = Field(min_length=1)
@@ -75,6 +83,8 @@ class WorkflowState(BaseModel):
     trace_id: str | None = None
     execution_id: str | None = None
     research: str | None = None
+    memory_context: str | None = None
+    retrieved_memory_ids: list[str] = Field(default_factory=list)
     generated_script: ShortScript | None = None
     script_version: int = Field(default=0, ge=0)
     evaluation: ScriptEvaluation | None = None
@@ -84,6 +94,11 @@ class WorkflowState(BaseModel):
     max_iterations: int = Field(default=3, ge=1)
     best_script: ShortScript | None = None
     best_score: float | None = None
+    human_decision: HumanDecision | None = None
+    human_feedback: str | None = None
+    human_reviewer: str | None = None
+    human_reviewed_at: datetime | None = None
+    human_revision_count: int = Field(default=0, ge=0)
     status: WorkflowStatus = WorkflowStatus.INITIALIZED
     error: str | None = None
     error_class: FailureClass | None = None

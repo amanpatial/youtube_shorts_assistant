@@ -16,6 +16,17 @@ def test_settings_defaults(monkeypatch):
     assert s.llm_timeout_seconds == 30.0
     assert s.llm_max_attempts == 3
     assert s.live_judge_fallback is True
+    assert s.hitl_required is False
+    assert s.max_human_rounds == 2
+    assert s.model_research == ""
+    assert s.model_write == ""
+    assert s.model_fallback == ""
+    assert s.a2a_research_enabled is False
+    assert s.a2a_research_required is False
+    assert s.job_max_attempts == 3
+    assert s.worker_poll_sec == 1.0
+    assert s.api_rate_limit_per_min == 30
+    assert s.output_policy_enabled is True
 
 
 def test_validate_for_runtime_requires_api_key(monkeypatch):

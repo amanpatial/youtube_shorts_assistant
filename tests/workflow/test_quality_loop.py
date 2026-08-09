@@ -168,6 +168,7 @@ def test_7_best_version_preserved_across_worse_scores():
 def test_graph_has_quality_gate_and_max_iterations_default():
     g = build_graph()
     assert "quality_gate" in g.nodes
+    assert "memory_retrieve" in g.nodes
     state = WorkflowState.initial("x")
     assert state.max_iterations == 3
 

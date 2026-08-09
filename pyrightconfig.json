@@ -1,0 +1,13 @@
+{
+  "include": ["src"],
+  "exclude": ["**/__pycache__", "venv", ".venv", "archive"],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": false,
+  "reportArgumentType": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportAttributeAccessIssue": "warning",
+  "venvPath": ".",
+  "venv": "venv"
+}

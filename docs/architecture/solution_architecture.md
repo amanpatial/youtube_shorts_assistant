@@ -2,7 +2,8 @@
 
 **Status:** Confirmed target (LangGraph-only). Use this file as the **single consolidated solution view** while implementing phase by phase.  
 **Process:** [Master learning roadmap](../plans/00_master_learning_roadmap_24e99839.plan.md)  
-**Stack decision:** LangGraph = sole active runtime. Google ADK = `archive/adk_baseline/` only (after Phase 1 implement).
+**Stack decision:** LangGraph = sole active runtime. Google ADK = `archive/adk_baseline/` only.  
+**ADR:** [0001 — primary orchestration framework](../adr/0001-primary-orchestration-framework.md) · [comparison](adk_vs_langgraph.md)
 
 ---
 
@@ -91,9 +92,9 @@ flowchart TB
   Client --> API --> SG
 
   subgraph workflow [Workflow]
-    Research --> Writer --> Evaluator --> Gate{QualityGate}
+    Research --> Memory --> Writer --> Evaluator --> Gate{QualityGate}
     Gate -->|FAIL| Writer
-    Gate -->|PASS| Visualizer --> Formatter --> HITL[HumanApproval] --> Done
+    Gate -->|PASS| HITL[HumanApproval] --> Visualizer --> Formatter --> Done
   end
 
   SG --> Research
@@ -139,17 +140,18 @@ flowchart TB
 
 | Node           | Responsibility                                               | Primary phase |
 | -------------- | ------------------------------------------------------------ | ------------- |
-| Research       | Gather context for the idea (tools/RAG later)                | 2–3, +11/12   |
+| Research       | Gather context (MCP / optional A2A)                          | 2–3, +12/15   |
+| Memory         | Retrieve long-term memory into writer context                | 11            |
 | Writer         | Produce / revise Shorts script                               | 3, 5          |
 | Evaluator      | Score/judge script; **does not** mutate script               | 4             |
 | Quality Gate   | Deterministic PASS / FAIL / exhaust using scores + iteration | 5             |
+| Human Approval | `interrupt` / resume **before** visuals (approve → continue) | 13            |
 | Visualizer     | Visual concepts from approved script                         | 3–5           |
 | Formatter      | Structured `ShortConcept` (or successor schema)              | 3             |
-| Human Approval | `interrupt` / resume before Done                             | 13            |
 | Done           | Terminal success                                             | —             |
 
 
-**Quality loop:** FAIL → Writer (then Evaluator again). PASS → Visualizer → Formatter → HITL → Done. Max iterations enforced in gate/state (Phase 5).
+**Quality loop:** FAIL → Writer (then Evaluator again). PASS / EXHAUSTED → HITL → (approve) Visualizer → Formatter → Done. Max iterations enforced in gate/state (Phase 5). See also [adk_to_langgraph.md](adk_to_langgraph.md).
 
 **Typed state (Phase 2):** channels for topic, research notes, script, evaluation, best_script/best_score, iteration, visuals, final concept, approval flags, errors.
 
@@ -167,7 +169,8 @@ Bolted onto LangGraph — **not** a second orchestrator.
 | PostgreSQL / checkpointing | 10      | Durable thread state + domain records          |
 | Evaluation                 | 4, 5, 8 | Online evaluator node + offline golden dataset |
 | Observability              | 9       | Traces/metrics/logs per node / run             |
-| RAG                        | 11      | Retrieval into Research/Writer context         |
+| RAG                        | 11      | Custom SQL memory (not LG Store; see Phase 20) |
+| Stream / time-travel       | 20      | `graph_ops` stream + `get_state` history       |
 | MCP                        | 12      | Tools/data (Search, YouTube, GitHub, …)        |
 | A2A                        | 15      | Peer agents (Research, Analytics, …)           |
 | Model Router               | 14      | Model choice per node/task                     |
@@ -234,8 +237,9 @@ youtube_shorts_assistant/
 ├── src/
 │   └── shorts_assistant/              ← LangGraph app (Phase 1+)
 │       ├── graph.py                   ← StateGraph compose
+│       ├── graph_ops.py               ← stream + state history (Phase 20)
 │       ├── state.py                   ← typed state (Phase 2+)
-│       ├── nodes/                     ← research, writer, …
+│       ├── nodes.py                   ← research, writer, …
 │       ├── config.py
 │       ├── schemas.py
 │       └── ...
@@ -321,6 +325,6 @@ After each phase completes, the solution grows as follows (cumulative).
 | Contracts                | [03_…](../plans/03_phase_structured_contracts_82d939d7.plan.md)                                                    |
 | Evaluator / quality loop | [04_…](../plans/04_phase_real_evaluator_99ae754e.plan.md), [05_…](../plans/05_phase_quality_loop_ad5c8440.plan.md) |
 | Platform phases          | [08–16](../plans/)                                                                                                 |
-| ADR                      | [21_…](../plans/21_phase_adk_vs_langgraph_adr_26a2def9.plan.md)                                                    |
+| ADR (Accepted)           | [0001](../adr/0001-primary-orchestration-framework.md) · [comparison](adk_vs_langgraph.md) · [plan 21](../plans/21_phase_adk_vs_langgraph_adr_26a2def9.plan.md) |
 
 

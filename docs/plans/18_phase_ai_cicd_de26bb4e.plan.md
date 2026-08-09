@@ -4,19 +4,19 @@ overview: "Phase 18 defines a PR CI pipeline (format, lint, types, unit/integrat
 todos:
   - id: p18-teach
     content: Document why traditional CI is insufficient for AI and how eval gates complement pytest
-    status: pending
+    status: completed
   - id: p18-ci-classic
     content: "GitHub Actions: ruff format/lint, pyright, unit+integration pytest, pip-audit + secret scan"
-    status: pending
+    status: completed
   - id: p18-eval-gate
     content: Implement eval_gate + quality_gate.yaml; unit tests for pass/fail deltas
-    status: pending
+    status: completed
   - id: p18-ai-workflows
     content: Conditional ai-eval.yml on AI paths/label + nightly full eval; fork-safe skip
-    status: pending
+    status: completed
   - id: p18-docs
     content: Document baseline updates, GOOGLE_API_KEY secret, smoke vs full dataset
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -35,6 +35,72 @@ isProject: false
 - Do **not** require Kubernetes deploy in this phase
 - Live LLM eval: **conditional** (label / path filter / nightly) with cached baseline compare—not unbounded Gemini spend on every typo PR
 - Builds on Phase 7 test layout, Phase 8 dataset/baseline, Phase 17 security
+
+**Status:** Implemented locally as **0.18.0** (2026-08-05). Uncommitted until batch check (Phases 11–21).  
+**Commit policy:** batch code-check/commit for Phases 11–21 later (no commit until you ask).  
+**Note:** Pushing `.github/workflows/*` may need GitHub token `workflow` scope (see `.github/README.md`).
+
+## Inspect findings (2026-08-05)
+
+| Area | Finding |
+|------|---------|
+| `.github/workflows/ci.yml` | **Thin**: ruff check + bare `pytest -q` (runs `@llm` if collected; no format/types/security) |
+| Markers | Code uses `-m "not llm and not a2a"` locally; **CI does not** |
+| pyright / ty | **Missing** from deps and CI |
+| pip-audit / gitleaks | **Missing** |
+| `eval_gate` module | **Missing** |
+| `evals/quality_gate.yaml` | **Missing** |
+| Smoke dataset | **Missing** (`shorts_v1_dataset.json` exists; no `shorts_v1_smoke.json`) |
+| Committed baseline | **Missing** under `evals/results/baselines/` (only `.gitignore`) |
+| `ai-eval.yml` / nightly | **Missing** |
+| Phase 8 compare | `eval.compare` deltas exist — gate can wrap this |
+| Package name | Use `python -m shorts_assistant.eval_gate` (not `youtube_shorts_assistant`) |
+
+### What already exists (reuse)
+
+- Test pyramid + markers (`llm`, `a2a`)  
+- `python -m shorts_assistant.eval run|compare` (demo + live_judge)  
+- `requirements-dev.txt` with pytest/ruff  
+- Thin CI scaffold to expand  
+
+### Gaps this phase must close
+
+1. Expand `ci.yml`: format, lint, types (pyright basic), pytest with markers, pip-audit, secret scan  
+2. `evals/quality_gate.yaml` + `shorts_assistant.eval_gate` (exit 1 on fail)  
+3. Commit a **demo-mode** baseline (or generate in CI once) + smoke dataset (5 cases)  
+4. `ai-eval.yml` path/label conditional; fork-safe skip without secrets  
+5. `nightly-eval.yml` full dataset monitor  
+6. Unit tests for gate logic; README: baseline update process + secrets  
+7. Target **0.18.0**  
+
+### Concrete design (for Approve)
+
+**PR always (no Gemini):**
+```text
+ruff format --check → ruff check → pyright → pytest -m "not llm and not a2a"
+→ pip-audit → gitleaks (or trufflehog)
+```
+
+**AI eval (conditional):**
+- Paths: `prompts/`, `quality_gate.py`, `schemas.py`, `models/`, `judge.py`, `evals/*.json`, `demo_producers.py`, …
+- Or label `run-ai-eval`
+- Default mode for PR gate: **`demo`** (deterministic, free) vs committed `evals/results/baselines/baseline_demo_v1.json`
+- Optional `live_judge` job only if `GOOGLE_API_KEY` secret present (skip forks)
+- Smoke: `evals/shorts_v1_smoke.json` (5 cases); nightly: full 20
+
+```text
+src/shorts_assistant/eval_gate/
+  __main__.py
+  gate.py          # load yaml + compare_summaries → pass/fail
+evals/
+  quality_gate.yaml
+  shorts_v1_smoke.json
+  results/baselines/baseline_demo_v1.json
+.github/workflows/
+  ci.yml
+  ai-eval.yml
+  nightly-eval.yml
+```
 
 ---
 

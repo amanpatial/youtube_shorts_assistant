@@ -4,19 +4,19 @@ overview: "Phase 12 adds one in-repo MCP server (shorts catalog) connected via L
 todos:
   - id: p12-teach
     content: Explain Agent→MCP Client→Server→Tool/Resource and MCP vs A2A
-    status: pending
+    status: completed
   - id: p12-server
     content: Implement shorts_catalog MCP server with list/search/get tools + Pydantic validation
-    status: pending
+    status: completed
   - id: p12-client
     content: "Wire LangGraph/langchain MCP adapters to Research node: allowlist, timeout, degraded errors, obs logs"
-    status: pending
+    status: completed
   - id: p12-tests
     content: "Integration tests: discovery, invocation, validation, timeout, allowlist, wiring"
-    status: pending
+    status: completed
   - id: p12-docs
     content: Document enable flag, read-only boundary, and that agents are not replaced
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -36,6 +36,41 @@ isProject: false
 - Use LangGraph/langchain MCP adapters + local stdio server
 - Do **not** implement A2A in this phase
 - Single service deploy: MCP server as a **subprocess** (stdio), not a microservice fleet
+
+**Status:** Implemented (package **0.12.0**). In-process catalog client for CI + FastMCP stdio server entrypoint.
+
+## Inspect findings (2026-08-04)
+
+| Area | Finding |
+|------|---------|
+| MCP package / server | **Missing** — no `mcp_servers/`, no `mcp_client.py` |
+| Deps | No `mcp` / `langchain-mcp-adapters` in `requirements.txt` |
+| Research node | Offline `demo_research` only — no tool calls |
+| Catalog data | Exists via Phase 10 `executions` / `script_versions` / `evaluations` (+ Phase 11 `memory_items`) |
+| Observability | Phase 9 `log_event` / `trace_id` ready to attach MCP fields |
+| Config | No `MCP_SHORTS_CATALOG_ENABLED` / timeout / allowlist |
+| A2A | Not present (correct — Phase 15) |
+
+### What already exists (reuse)
+
+- Domain DB for read-only catalog queries  
+- `research_node` as additive attach point  
+- Failure taxonomy (Phase 6) for degraded/transient classification  
+- Obs JSON events with `trace_id` (plan text still says `workflow_id` in places — use **`trace_id`**)
+
+### Gaps this phase must close
+
+1. In-repo `shorts_catalog` MCP server (3 read-only tools + optional stats resource)  
+2. Client helper: discovery, allowlist, timeout, degraded continue  
+3. Wire Research to call catalog when enabled (offline: deterministic tool calls, not live LLM tool-picking)  
+4. Integration tests without Gemini  
+5. Docs: MCP ≠ A2A; enable flag; fail-open  
+
+### Concrete design note (CI-friendly)
+
+Plan mentions langchain MCP adapters + stdio. For this learning repo also keep an **in-process catalog service** used by the same tool handlers so tests do not require a live stdio round-trip for every case; stdio server remains the real MCP surface (`python -m shorts_assistant.mcp_servers.shorts_catalog`).
+
+Target package version after implement: **0.12.0**.
 
 ---
 
@@ -217,4 +252,11 @@ Use in-process or stdio subprocess with temp SQLite/Postgres test DB. Mark `@pyt
 - Discovery, invocation, validation, timeout, errors, permissions, observability implemented  
 - Existing agents preserved  
 - Integration tests green  
-- MCP clearly not A2A
+- MCP clearly not A2A  
+
+## Approval gate
+
+Implement only after explicit:
+
+- “Approve Phase 12 design — implement”  
+- or “Approved, proceed with implementation”

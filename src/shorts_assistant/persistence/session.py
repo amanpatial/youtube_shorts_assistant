@@ -29,6 +29,7 @@ def _resolve_database_url() -> str:
         return url
     return default_sqlite
 
+
 @lru_cache
 def get_engine(url: str | None = None) -> Engine:
     """Purpose: one cached engine per process (or explicit URL for tests)."""

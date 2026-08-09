@@ -4,19 +4,19 @@ overview: "Phase 17 performs a concrete threat analysis for the LangGraph Shorts
 todos:
   - id: p17-teach
     content: "Document threat table + 5-category LLM guardrails taxonomy (brand-free diagrams) mapped to Shorts controls"
-    status: pending
+    status: completed
   - id: p17-authz
     content: API bearer auth + workflow ownership binding; 401/403 tests
-    status: pending
+    status: completed
   - id: p17-ratelimit
     content: Per-key rate limit on POST /shorts with 429 tests
-    status: pending
+    status: completed
   - id: p17-redact-input-output
     content: Secret redaction, input fencing/PII heuristics, output policy, worker timeout
-    status: pending
+    status: completed
   - id: p17-tests-docs
     content: Security unit/API tests + concise README/SECURITY notes; confirm MCP allowlist
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -35,6 +35,65 @@ isProject: false
 - Implement **highest-value** controls only (no policy engine framework, no SOC2 binder)
 - Build on Phase 16 API, MCP allowlists, contract validation, HITL
 - Do not introduce Kubernetes or WAF appliances
+
+**Status:** Implemented locally as **0.17.0** (2026-08-05). Uncommitted until batch check (Phases 11–21).  
+**Commit policy:** batch code-check/commit for Phases 11–21 later (no commit until you ask).
+
+## Inspect findings (2026-08-05)
+
+| Area | Finding |
+|------|---------|
+| API auth | `X-API-Key` vs single `API_KEY` — **no** Bearer, **no** multi-key, **no** ownership |
+| Workflows | No `owner_key_id` column — IDOR possible across keys if multi-tenant later |
+| Rate limit | **Missing** — unlimited `POST /shorts` |
+| Redaction | Phase 9 `redact_text` / memory writer — **not** applied to FastAPI error bodies |
+| Input guard | `MAX_INPUT_LENGTH` in settings — **not enforced** on API create / CLI |
+| Injection fence | **Missing** — topic passed raw into demo/live prompts |
+| Output policy | **Missing** — only evaluator/contracts |
+| Worker timeout | Job retries exist; **no** wall-clock `JOB_TIMEOUT_SEC` |
+| MCP allowlist | Phase 12 present + validated args — confirm/expand tests |
+| `security/` package | **Missing** |
+| `.env` | Gitignored (good) |
+
+### What already exists (reuse)
+
+- `require_api_key` dependency on mutating/status routes  
+- Obs redaction helpers (`AIza…`, `sk-`, key= patterns)  
+- MCP allowlist + Pydantic tool args + timeouts  
+- Contracts fail-closed; HITL for residual risk  
+- `max_iterations` / `max_human_rounds` / MCP timeout  
+
+### Gaps this phase must close
+
+1. `security/` package: auth ownership, rate limit, redact (shared), input_guard, output_policy  
+2. Bind `owner_key_id` (hash of API key) on workflow create; enforce on GET/approve/revise → 403  
+3. Accept `Authorization: Bearer` **or** `X-API-Key` (compat)  
+4. Per-key rate limit on `POST /shorts` → 429 + `Retry-After`  
+5. Enforce max length + injection fence + PII heuristics on topic  
+6. Output policy before result “publishable”; force HITL or fail  
+7. Worker wall-clock timeout  
+8. Tests under `tests/unit/security/` + API 401/403/429; README SECURITY notes  
+9. Target **0.17.0**  
+
+### Concrete design (for Approve)
+
+```text
+security/
+  auth.py          # verify key; key_id = sha256(key)[:16]; Bearer | X-API-Key
+  rate_limit.py    # in-process token bucket per key_id
+  redact.py        # re-export / thin wrap of obs.redact_text for API
+  input_guard.py   # length, USER_TOPIC fence, injection heuristics, PII
+  output_policy.py # blocklist phrases → reject / force_hitl
+```
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `API_RATE_LIMIT_PER_MIN` | `30` | POST /shorts per key |
+| `JOB_TIMEOUT_SEC` | `300` | Worker wall clock |
+| `FORCE_HITL_ON_INJECTION` | `true` | Heuristic hit → hitl_required |
+| `OUTPUT_POLICY_ENABLED` | `true` | Scan script/concept before result |
+
+**Authz:** store `workflows.owner_key_id`; mismatch → **403** (not 404) so tests are clear. Single shared `API_KEY` still gets a stable key_id (multi-key can come later via `API_KEYS=k1,k2`).
 
 ---
 

@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from ..config import PROJECT_ROOT
-from .compare import ModeMismatchError, compare_files
+from .compare import ModeMismatchError, compare_files, model_compare_files
 from .runner import run_from_path
 
 
@@ -17,11 +17,17 @@ def _default_dataset() -> Path:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    memory_flag: bool | None = None
+    if args.memory == "on":
+        memory_flag = True
+    elif args.memory == "off":
+        memory_flag = False
     artifact = run_from_path(
         args.dataset,
         mode=args.mode,
         out_dir=args.out,
         save_baseline_path=args.save_baseline,
+        memory_retrieval=memory_flag,
     )
     print(json.dumps(artifact["summary"], indent=2))
     if args.out:
@@ -37,6 +43,20 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     except ModeMismatchError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def _cmd_model_compare(args: argparse.Namespace) -> int:
+    try:
+        result = model_compare_files(args.baseline, args.candidate)
+    except ModeMismatchError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        print(f"wrote {args.out}", file=sys.stderr)
     print(json.dumps(result, indent=2))
     return 0
 
@@ -74,12 +94,32 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Also copy this run to a baseline path",
     )
+    run_p.add_argument(
+        "--memory",
+        choices=("auto", "on", "off"),
+        default="auto",
+        help="Phase 11 A/B: force MEMORY_RETRIEVAL on/off (auto = settings)",
+    )
     run_p.set_defaults(func=_cmd_run)
 
     cmp_p = sub.add_parser("compare", help="Compare candidate vs baseline")
     cmp_p.add_argument("--baseline", type=Path, required=True)
     cmp_p.add_argument("--candidate", type=Path, required=True)
     cmp_p.set_defaults(func=_cmd_compare)
+
+    mc_p = sub.add_parser(
+        "model-compare",
+        help="Phase 14: compare two runs with model map + metric deltas",
+    )
+    mc_p.add_argument("--baseline", type=Path, required=True)
+    mc_p.add_argument("--candidate", type=Path, required=True)
+    mc_p.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Optional path to write model_compare.json",
+    )
+    mc_p.set_defaults(func=_cmd_model_compare)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

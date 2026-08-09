@@ -1,0 +1,91 @@
+name: Nightly full eval
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  full-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Full demo dataset (20 cases)
+        env:
+          GOOGLE_API_KEY: test-not-used
+          GOOGLE_GENAI_USE_VERTEXAI: "FALSE"
+          HITL_REQUIRED: "false"
+          A2A_RESEARCH_ENABLED: "false"
+        run: |
+          PYTHONPATH=src python -m shorts_assistant.eval run \
+            --mode demo \
+            --dataset evals/shorts_v1_dataset.json \
+            --out evals/results/runs \
+            --save-baseline /tmp/nightly_demo.json
+
+      - name: Quality gate vs smoke baseline (monitor)
+        # Nightly uses full dataset; gate vs smoke baseline is informational on size mismatch.
+        # Primary signal: job succeeds and metrics are logged. Fail only if smoke gate path
+        # is used with matching n; for full runs we compare deltas when modes match.
+        run: |
+          PYTHONPATH=src python - <<'PY'
+          import json
+          from pathlib import Path
+          art = json.loads(Path("/tmp/nightly_demo.json").read_text())
+          s = art.get("summary") or art
+          print(json.dumps({k: s.get(k) for k in (
+              "n_cases", "pass_rate", "average_quality", "failure_rate",
+              "approval_rate", "mode", "run_id",
+          )}, indent=2))
+          if float(s.get("failure_rate") or 0) > 0.15:
+              raise SystemExit("nightly failure_rate above 0.15")
+          PY
+
+  full-live-judge:
+    if: github.repository_owner != '' # always; skip inside if no secret
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check API key
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "No GOOGLE_API_KEY — skipping live_judge nightly."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          else
+            echo "SKIP=0" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up Python
+        if: env.SKIP == '0'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install + run live_judge full
+        if: env.SKIP == '0'
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_GENAI_USE_VERTEXAI: "FALSE"
+          HITL_REQUIRED: "false"
+          A2A_RESEARCH_ENABLED: "false"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          PYTHONPATH=src python -m shorts_assistant.eval run \
+            --mode live_judge \
+            --dataset evals/shorts_v1_dataset.json \
+            --out evals/results/runs

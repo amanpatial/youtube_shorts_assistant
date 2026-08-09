@@ -73,16 +73,10 @@ def test_trace_id_on_nested_events():
             finalize_trace(trace, final)
         assert get_trace_id() is None
         events = [
-            getattr(r, "obs_event", {})
-            for r in handler.records
-            if getattr(r, "obs_event", None)
+            getattr(r, "obs_event", {}) for r in handler.records if getattr(r, "obs_event", None)
         ]
         assert any(e.get("trace_id") == "wf_test_123" for e in events)
-        scores = [
-            e.get("evaluation_score")
-            for e in events
-            if e.get("event") == "agent_end"
-        ]
+        scores = [e.get("evaluation_score") for e in events if e.get("event") == "agent_end"]
         assert 6.8 in scores and 8.2 in scores
         summary = next(e for e in events if e.get("event") == "workflow_summary")
         assert summary.get("final_status") == "COMPLETED"
@@ -95,9 +89,7 @@ def test_observe_node_fail_open_on_logger(monkeypatch):
     def boom_log(*_a, **_k):
         raise RuntimeError("logger down")
 
-    monkeypatch.setattr(
-        "shorts_assistant.observability.log_event", boom_log
-    )
+    monkeypatch.setattr("shorts_assistant.observability.log_event", boom_log)
 
     def node(_state):
         return {"status": WorkflowStatus.RESEARCHING}
@@ -112,9 +104,7 @@ def test_observe_node_fail_open_on_logger(monkeypatch):
 
 
 def test_setup_telemetry_noop_when_disabled(monkeypatch):
-    monkeypatch.setattr(
-        "shorts_assistant.telemetry.settings.enable_otel", False
-    )
+    monkeypatch.setattr("shorts_assistant.telemetry.settings.enable_otel", False)
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
     setup_telemetry()  # should not raise

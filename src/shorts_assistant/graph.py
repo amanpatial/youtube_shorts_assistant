@@ -10,9 +10,11 @@ from __future__ import annotations
 from langgraph.graph import END, START, StateGraph
 
 from .checkpointer import get_checkpointer
+from .hitl import human_review_node, route_after_human
 from .nodes import (
     evaluator_node,
     formatter_node,
+    memory_retrieve_node,
     research_node,
     scriptwriter_node,
     visualizer_node,
@@ -23,20 +25,23 @@ from .state import WorkflowState
 
 
 def build_graph() -> StateGraph:
-    """Purpose: research once, then script↔eval↔gate loop, then visual→format.
+    """Purpose: research → memory → script↔eval↔gate → human → visual→format.
 
     Returns: an uncompiled ``StateGraph`` ready for ``.compile()``.
     """
     graph = StateGraph(WorkflowState)
     graph.add_node("research", observe_node("research", research_node))
+    graph.add_node("memory_retrieve", observe_node("memory_retrieve", memory_retrieve_node))
     graph.add_node("scriptwriter", observe_node("scriptwriter", scriptwriter_node))
     graph.add_node("evaluator", observe_node("evaluator", evaluator_node))
     graph.add_node("quality_gate", observe_node("quality_gate", quality_gate_node))
+    graph.add_node("human_review", observe_node("human_review", human_review_node))
     graph.add_node("visualizer", observe_node("visualizer", visualizer_node))
     graph.add_node("formatter", observe_node("formatter", formatter_node))
 
     graph.add_edge(START, "research")
-    graph.add_edge("research", "scriptwriter")
+    graph.add_edge("research", "memory_retrieve")
+    graph.add_edge("memory_retrieve", "scriptwriter")
     graph.add_edge("scriptwriter", "evaluator")
     graph.add_edge("evaluator", "quality_gate")
     graph.add_conditional_edges(
@@ -44,7 +49,16 @@ def build_graph() -> StateGraph:
         route_after_gate,
         {
             "retry": "scriptwriter",
+            "continue": "human_review",
+            "fail": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "human_review",
+        route_after_human,
+        {
             "continue": "visualizer",
+            "revise": "scriptwriter",
             "fail": END,
         },
     )

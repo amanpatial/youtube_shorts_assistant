@@ -4,22 +4,22 @@ overview: "Phase 11 adds long-term memory/RAG for the LangGraph Shorts Assistant
 todos:
   - id: p11-teach
     content: Explain RAG, embeddings, vector search, similarity, short vs long-term memory, do-not-store list; justify pgvector over Qdrant
-    status: pending
+    status: completed
   - id: p11-store
     content: Add memory_items schema + MemoryStore/PgVectorMemoryStore + embed/retrieve/context/writer modules
-    status: pending
+    status: completed
   - id: p11-wire
     content: Inject memory_context before Scriptwriter; persist useful hooks/scripts after pass/best
-    status: pending
+    status: completed
   - id: p11-measure
     content: "A/B eval protocol: MEMORY_RETRIEVAL on/off + compare metrics"
-    status: pending
+    status: completed
   - id: p11-tests
     content: Unit tests with mocked embeddings; writer threshold; context bounds
-    status: pending
+    status: completed
   - id: p11-docs
     content: Document retention, privacy, and how to run retrieval lift measurement
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -39,6 +39,38 @@ isProject: false
 - Do **not** store secrets, full system prompts, or raw API keys
 - Measure lift with Phase 8 eval harness (with vs without retrieval)
 - Depends on: persistent executions/script_versions/evaluations, structured scripts, eval runner
+
+**Status:** Implemented (package **0.11.0**). CI uses SQLAlchemy JSON embeddings + cosine; pgvector optional later.
+
+## Inspect findings (2026-08-04, post Phase 10 / 0.10.0)
+
+| Area | Finding |
+|------|---------|
+| `memory/` package | Placeholder only — `__init__.py` with no modules |
+| State fields | No `memory_context` / `retrieved_memory_ids` on `WorkflowState` |
+| Graph | `research → scriptwriter` direct; no retrieve node |
+| Scriptwriter | Uses `request` + `research` + eval feedback only; ignores memory |
+| Writer after gate | Gate continues to visualizer; no memory persist hook |
+| Schema / Alembic | No `memory_items` table; Phase 10 has 5 domain tables only |
+| Embeddings / pgvector | Not in deps; CI uses SQLite (no pgvector) |
+| Config | No `MEMORY_RETRIEVAL` / `MEMORY_RETENTION_DAYS` |
+| Eval A/B | Phase 8 runner has no memory on/off switch |
+| Confusion risk | `CHECKPOINT_BACKEND=memory` = LG MemorySaver — **not** RAG memory |
+
+### What already exists (reuse)
+
+- Durable `script_versions` + `evaluations` + `best_score` (seed / audit source)
+- `invoke_workflow` + `_persist_final` as write hook points
+- Offline eval `run` / `compare` for lift measurement
+- Observability `trace_id` / `execution_id` for memory row linkage
+
+### Gaps this phase must close
+
+1. `MemoryStore` + CI-safe store (JSON embeddings / cosine) + optional Postgres/pgvector path  
+2. Retrieve → `memory_context` before scriptwriter; store on PASS/EXHAUSTED  
+3. Config flags + do-not-store / retention docs  
+4. Eval A/B protocol (`MEMORY_RETRIEVAL` on/off)  
+5. Unit tests with mocked embeddings  
 
 ---
 
@@ -190,6 +222,58 @@ Do not optimize prompts aggressively in this phase—only add memory context cha
 
 ---
 
+## Concrete design (for Approve)
+
+### Teaching map → implementation
+
+| Concept | Implementation |
+|---------|----------------|
+| Short-term memory | `WorkflowState` + LG checkpointer (already Phase 10) |
+| Long-term memory | `memory_items` + `MemoryStore` |
+| Embeddings | `embed_texts()` — deterministic hash/fake for CI; optional Gemini embed when keyed |
+| Vector search | Cosine top-k over stored vectors |
+| RAG inject | `memory_retrieve` node → `memory_context` before scriptwriter |
+| Persist useful | Writer after PASS/EXHAUSTED (score ≥ threshold); fail-open |
+
+### Decision: store backends (same service)
+
+| Backend | Role | Default |
+|---------|------|---------|
+| `SqliteJsonMemoryStore` (or in-process) | CI/local — embeddings as JSON, brute-force cosine | **Yes for CI** |
+| `PgVectorMemoryStore` | Prod Postgres + `pgvector` when `DATABASE_URL` is Postgres | Optional |
+| Qdrant | Out of scope | No |
+
+`MemoryStore` protocol keeps swap possible without rewriting nodes.
+
+### Graph wiring
+
+```text
+research → memory_retrieve → scriptwriter ↔ evaluator ↔ quality_gate
+                              → (on continue) maybe_persist_memory → visualizer → formatter
+```
+
+Or persist from `run._persist_final` / gate continue path (same process).
+
+### Config
+
+| Knob | Purpose |
+|------|---------|
+| `MEMORY_RETRIEVAL` | `true`/`false` — inject context (default `true` locally; eval A/B toggles) |
+| `MEMORY_TOP_K` | default 3 |
+| `MEMORY_MAX_CONTEXT_CHARS` | default 1500 |
+| `MEMORY_WRITE_MIN_SCORE` | default = quality threshold |
+| `MEMORY_RETENTION_DAYS` | document + stub cleanup |
+
+### Package / version
+
+`memory/{embeddings,store,retriever,context,writer}.py` · Alembic `memory_items` · package **0.11.0**
+
+### Out of scope
+
+Qdrant, memory microservice, full prompt rewrite, audience_feedback fills (schema stub only)
+
+---
+
 ## Implementation order (after approval)
 
 1. Teach RAG/embeddings/search/similarity/memory tiers + do-not-store  
@@ -203,6 +287,13 @@ Do not optimize prompts aggressively in this phase—only add memory context cha
 
 - Concepts explained  
 - Retrieve → context → generate → evaluate → store path works  
-- Vector search via pgvector (Qdrant not required)  
+- Vector search via MemoryStore (pgvector optional; CI uses SQLite/JSON vectors)  
 - Measurement protocol compares scores with/without retrieval  
-- Unsafe/sensitive content policy documented and enforced in writer
+- Unsafe/sensitive content policy documented and enforced in writer  
+
+## Approval gate
+
+Implement only after explicit:
+
+- “Approve Phase 11 design — implement”  
+- or “Approved, proceed with implementation”

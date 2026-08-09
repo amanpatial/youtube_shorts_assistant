@@ -4,13 +4,13 @@ overview: "Phase 21 ADR documents the confirmed decision: LangGraph-only active 
 todos:
   - id: p21-compare-doc
     content: Write docs/architecture/adk_vs_langgraph.md with full 20-dimension comparison (learning), strengths, weaknesses, trade-offs, scenarios
-    status: pending
+    status: completed
   - id: p21-adr
     content: "Write docs/adr/0001-primary-orchestration-framework.md: LangGraph-only; ADK archived under archive/adk_baseline/"
-    status: pending
+    status: completed
   - id: p21-readme
     content: Point README at ADR — LangGraph-only; ADK archive reference
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -34,6 +34,58 @@ isProject: false
 - Honest comparison (no fake universal winner)
 - **Decision already made:** LangGraph-only; ADK archived — ADR records it  
 - Do not propose reviving dual-stack maintenance  
+- Docs/ADR phase — **no** runtime rewrite; version bump to **0.21.0** only  
+
+**Status:** Implemented locally as **0.21.0** (2026-08-05). Uncommitted until batch check (Phases 11–21).  
+**Commit policy:** batch code-check/commit for Phases 11–21 later (no commit until you ask).
+
+## Inspect findings (2026-08-05)
+
+| Area | Finding |
+|------|---------|
+| Decision in code | **Already true** — sole package `shorts_assistant`; ADK under `archive/adk_baseline/` |
+| `docs/adr/` | **Missing** — no ADR files |
+| `docs/architecture/adk_vs_langgraph.md` | **Missing** |
+| Phase 20 map | [`adk_to_langgraph.md`](../architecture/adk_to_langgraph.md) exists (concept map + Store decision) — **not** the full 20-dimension comparison or formal ADR |
+| `solution_architecture.md` | Already states LangGraph-only; Phase 21 row points at this plan |
+| README | Notes ADK archived; **Next up** = Phase 21; no link to ADR yet |
+| Archive | Present; must **not** delete; must **not** revive as runtime |
+| Version | App **0.20.0** |
+
+### What already exists (reuse)
+
+- Locked narrative in master roadmap + solution architecture  
+- Phase 20 teaching map (`adk_to_langgraph.md`) — ADR/compare docs should **link** to it, not contradict  
+- 20-dimension matrix already drafted **in this plan** (copy into `adk_vs_langgraph.md` on implement)  
+
+### Gaps this phase must close
+
+1. Write `docs/architecture/adk_vs_langgraph.md` — full 20-dimension matrix + trade-offs + “when ADK / when LG” scenarios  
+2. Write `docs/adr/0001-primary-orchestration-framework.md` — Status **Accepted**; LangGraph-only; ADK archived  
+3. README: link ADR + comparison; mark Phases 1–21 complete; next = batch commit / done  
+4. Cross-link ADR ↔ `adk_to_langgraph.md` ↔ `solution_architecture.md`  
+5. Bump **0.21.0** (`__version__`, API, smoke test, `pyproject.toml`)  
+6. **No** dual-stack revival; **no** archive deletion; **no** feature work  
+
+### Concrete design (for Approve)
+
+```text
+docs/architecture/adk_vs_langgraph.md
+docs/adr/0001-primary-orchestration-framework.md
+docs/adr/README.md                     # optional one-liner index
+README.md                              # ADR pointer + version 0.21.0
+```
+
+**ADR skeleton:**
+
+1. Title / Status: **Accepted**  
+2. Context: ADK experiment → LangGraph rebuild for orchestration/eval/MCP/A2A/obs/persistence  
+3. Decision: **LangGraph-only active runtime; ADK = `archive/adk_baseline/` only**  
+4. Consequences (+/−)  
+5. Alternatives: ADK primary · dual-prod · delete archive (all rejected)  
+6. Links: comparison doc, concept map, solution architecture  
+
+**Compare doc:** promote the 20-dimension table from this plan; add short trade-off + scenario sections; point to Phase 20 map for node-level translation.
 
 ---
 

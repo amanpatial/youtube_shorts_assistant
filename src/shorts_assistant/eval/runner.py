@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ..config import PROJECT_ROOT, settings
-from ..eval_flags import live_judge_mode
+from ..eval_flags import live_judge_mode, memory_retrieval_mode
+from ..models.registry import task_model_map
 from ..run import invoke_workflow
 from .dataset import EvalCase, EvalDataset, load_dataset
 from .metrics import aggregate_metrics, case_record_from_state
@@ -34,10 +35,21 @@ def prompt_version() -> str:
 
 
 def default_invoke_case(case: EvalCase, mode: EvalMode) -> dict[str, Any]:
-    """Purpose: run the traced graph once for a case topic."""
+    """Purpose: run the traced graph once for a case topic.
+
+    Forces HITL off so bulk eval never blocks on interrupt (Phase 13).
+    """
     prefer_live = mode == "live_judge"
-    with live_judge_mode(prefer_live):
-        return invoke_workflow(case.input.topic).to_dict()
+    prev_hitl = settings.hitl_required
+    prev_a2a = settings.a2a_research_enabled
+    settings.hitl_required = False
+    settings.a2a_research_enabled = False
+    try:
+        with live_judge_mode(prefer_live):
+            return invoke_workflow(case.input.topic).to_dict()
+    finally:
+        settings.hitl_required = prev_hitl
+        settings.a2a_research_enabled = prev_a2a
 
 
 def run_dataset(
@@ -45,18 +57,28 @@ def run_dataset(
     *,
     mode: EvalMode = "demo",
     invoke_case: InvokeCaseFn | None = None,
+    memory_retrieval: bool | None = None,
 ) -> dict[str, Any]:
-    """Purpose: execute all cases, continue on failure, return run artifact dict."""
+    """Purpose: execute all cases, continue on failure, return run artifact dict.
+
+    ``memory_retrieval`` overrides MEMORY_RETRIEVAL for Phase 11 A/B runs.
+    """
     invoke = invoke_case or default_invoke_case
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
     started = time.perf_counter()
     records: list[dict[str, Any]] = []
 
+    def _run_case(case: EvalCase) -> dict[str, Any]:
+        if memory_retrieval is None:
+            return invoke(case, mode)
+        with memory_retrieval_mode(memory_retrieval):
+            return invoke(case, mode)
+
     for case in dataset.cases:
         case_error: str | None = None
         state: dict[str, Any] = {}
         try:
-            state = invoke(case, mode)
+            state = _run_case(case)
             if not isinstance(state, dict):
                 raise TypeError("invoke_case must return a state dict")
         except Exception as exc:  # noqa: BLE001 — continue remaining cases
@@ -75,7 +97,11 @@ def run_dataset(
     summary.update(
         {
             "mode": mode,
+            "memory_retrieval": (
+                settings.memory_retrieval if memory_retrieval is None else memory_retrieval
+            ),
             "model_name": settings.model_name,
+            "task_models": task_model_map(settings),
             "quality_threshold": settings.quality_threshold,
             "dataset_id": dataset.dataset_id,
             "dataset_version": dataset.version,
@@ -113,12 +139,18 @@ def run_from_path(
     out_dir: str | Path | None = None,
     save_baseline_path: str | Path | None = None,
     invoke_case: InvokeCaseFn | None = None,
+    memory_retrieval: bool | None = None,
 ) -> dict[str, Any]:
     """Purpose: load dataset, run, optionally write run/baseline files."""
     if mode == "live_judge":
         settings.validate_for_runtime()
     dataset = load_dataset(dataset_path)
-    artifact = run_dataset(dataset, mode=mode, invoke_case=invoke_case)
+    artifact = run_dataset(
+        dataset,
+        mode=mode,
+        invoke_case=invoke_case,
+        memory_retrieval=memory_retrieval,
+    )
     if out_dir is not None:
         write_run_artifact(artifact, out_dir)
     if save_baseline_path is not None:

@@ -47,6 +47,4 @@ def _has_live_credentials() -> bool:
 def pytest_runtest_setup(item: pytest.Item) -> None:
     """Purpose: skip ``@pytest.mark.llm`` tests when no Gemini/Vertex credentials."""
     if item.get_closest_marker("llm") is not None and not _has_live_credentials():
-        pytest.skip(
-            "llm test requires GOOGLE_API_KEY or GOOGLE_GENAI_USE_VERTEXAI=TRUE"
-        )
+        pytest.skip("llm test requires GOOGLE_API_KEY or GOOGLE_GENAI_USE_VERTEXAI=TRUE")

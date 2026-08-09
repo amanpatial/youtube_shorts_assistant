@@ -1,0 +1,114 @@
+name: AI eval (quality gate)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ai: ${{ steps.filter.outputs.ai }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ai:
+              - 'src/shorts_assistant/prompts/**'
+              - 'src/shorts_assistant/**/quality_gate.py'
+              - 'src/shorts_assistant/schemas.py'
+              - 'src/shorts_assistant/models/**'
+              - 'src/shorts_assistant/judge.py'
+              - 'src/shorts_assistant/demo_producers.py'
+              - 'src/shorts_assistant/eval/**'
+              - 'src/shorts_assistant/eval_gate/**'
+              - 'evals/**'
+              - '.github/workflows/ai-eval.yml'
+
+  demo-gate:
+    needs: changes
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.ai == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'run-ai-eval')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Demo smoke eval
+        env:
+          GOOGLE_API_KEY: test-not-used
+          GOOGLE_GENAI_USE_VERTEXAI: "FALSE"
+          HITL_REQUIRED: "false"
+          A2A_RESEARCH_ENABLED: "false"
+        run: |
+          PYTHONPATH=src python -m shorts_assistant.eval run \
+            --mode demo \
+            --dataset evals/shorts_v1_smoke.json \
+            --out evals/results/runs \
+            --save-baseline /tmp/candidate_demo.json
+
+      - name: Quality gate vs committed baseline
+        run: |
+          PYTHONPATH=src python -m shorts_assistant.eval_gate \
+            --baseline evals/results/baselines/baseline_demo_v1.json \
+            --candidate /tmp/candidate_demo.json \
+            --config evals/quality_gate.yaml
+
+  live-judge-smoke:
+    needs: demo-gate
+    # Fork-safe: never use secrets from fork PRs. Skip quietly without key.
+    if: >
+      always() &&
+      needs.demo-gate.result == 'success' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check GOOGLE_API_KEY
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "GOOGLE_API_KEY not set — skipping live_judge (fork-safe / no secret)."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          else
+            echo "SKIP=0" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up Python
+        if: env.SKIP == '0'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install + live_judge smoke
+        if: env.SKIP == '0'
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_GENAI_USE_VERTEXAI: "FALSE"
+          HITL_REQUIRED: "false"
+          A2A_RESEARCH_ENABLED: "false"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          PYTHONPATH=src python -m shorts_assistant.eval run \
+            --mode live_judge \
+            --dataset evals/shorts_v1_smoke.json \
+            --out evals/results/runs
+          echo "live_judge smoke complete (no committed live baseline gate yet)"

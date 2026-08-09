@@ -38,9 +38,7 @@ def apply_quality_gate(
 
     Returns: (decision, partial state update dict for the node to apply).
     """
-    thresh = (
-        settings.quality_threshold if threshold is None else threshold
-    )
+    thresh = settings.quality_threshold if threshold is None else threshold
 
     try:
         script = guard_script(state.generated_script, agent="quality_gate")

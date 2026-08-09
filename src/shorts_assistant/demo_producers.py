@@ -34,19 +34,33 @@ def demo_script(
     research: str | None = None,
     *,
     evaluation: ScriptEvaluation | None = None,
+    memory_context: str | None = None,
+    human_feedback: str | None = None,
 ) -> ShortScript:
     """Purpose: build a schema-valid ShortScript (optionally revised from issues).
 
     On retry, when ``evaluation.issues`` is present, appends an "Addressed feedback"
     clause so ``[retry-pass]`` judge can approve the second attempt.
+    When ``memory_context`` is set, adds a short inspired-by clause (not a verbatim copy).
+    ``human_feedback`` (Phase 13) is treated as hard revision guidance.
     """
     hook = f"Stop overcomplicating {request[:40]}."
-    body = (
-        f"Here is a practical take on {request}. "
-        f"{(research or '')[:120]}".strip()
-    )
+    body = f"Here is a practical take on {request}. {(research or '')[:120]}".strip()
     cta = "Try this pattern in your next short."
     title = request[:120]
+
+    if memory_context:
+        # Offline stand-in: acknowledge retrieval without copying past hooks.
+        body = f"{body} Inspired by past winning patterns (not copied)."
+
+    if human_feedback:
+        body = (
+            f"{body} Human revision guidance: {human_feedback[:200]}. "
+            "Rewrote hook/CTA to match reviewer notes."
+        )
+        hook = f"Revised per review: {request[:28]}."
+        cta = "Ship the revision your reviewer asked for."
+        title = f"Human-revised: {request[:90]}"
 
     if evaluation and evaluation.issues:
         feedback = "; ".join(evaluation.issues[:3])

@@ -4,22 +4,22 @@ overview: "Phase 15 introduces A2A as agent-to-agent interoperability (distinct 
 todos:
   - id: p15-teach
     content: Explain MCP vs A2A and function/tool/MCP/sub-agent/A2A-remote differences
-    status: pending
+    status: completed
   - id: p15-contract
     content: Define Research Agent identity, capabilities, ResearchRequest/Response, lifecycle, failures
-    status: pending
+    status: completed
   - id: p15-server
     content: Implement smallest research A2A server process (standalone; not ADK RemoteA2aAgent as primary)
-    status: pending
+    status: completed
   - id: p15-client
     content: Wire custom LG A2A client node behind A2A_RESEARCH_ENABLED; map response to WorkflowState.research
-    status: pending
+    status: completed
   - id: p15-tests
     content: Contract tests + mocked A2A + optional live a2a marker
-    status: pending
+    status: completed
   - id: p15-docs
     content: Document two-process local run and degraded fallback
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -43,6 +43,62 @@ Phase 12 MCP working (agent↔tool). This phase adds **agent↔agent** only afte
 - Prefer a custom LangGraph research node (HTTP/A2A client) + local A2A server process experiment
 - Feature flag: default path can remain in-process; A2A opt-in for the experiment
 - Not microservices for their own sake
+
+**Status:** Implemented locally as **0.15.0** (2026-08-05). Uncommitted until batch check (Phases 11–21).  
+**Commit policy:** batch code-check/commit for Phases 11–21 later (no commit until you ask).
+
+## Inspect findings (2026-08-05)
+
+| Area | Finding |
+|------|---------|
+| A2A code | **Missing** — no `a2a_*` package, no agent card, no remote client |
+| Research today | In-process `research_node` → `demo_research` + optional MCP catalog notes |
+| MCP (Phase 12) | `shorts_catalog` tools — agent↔tool (correctly separate from A2A) |
+| Config | No `A2A_RESEARCH_*` flags |
+| Deps | No `a2a-sdk`; HTTP client not required yet for research |
+| ADK | Archive only — do **not** use `RemoteA2aAgent` as primary |
+| CI | Must keep `A2A_RESEARCH_ENABLED=false` (default) so offline tests never need a peer process |
+
+### What already exists (reuse)
+
+- `WorkflowState.research: str | None` — map A2A response into a string brief  
+- MCP fail-open pattern (`research_catalog_notes`) — mirror for A2A degraded  
+- Obs `log_event` + timeouts pattern from `mcp_client`  
+- Two-process local run pattern (like MCP stdio server docs)  
+
+### Gaps this phase must close
+
+1. `ResearchRequest` / `ResearchResponse` Pydantic contracts  
+2. Standalone research agent process + agent card + task endpoint  
+3. Custom LG client behind `A2A_RESEARCH_ENABLED` (default **false**)  
+4. Timeout / malformed / down → degraded (or fail if `A2A_RESEARCH_REQUIRED`)  
+5. Docs: MCP vs A2A vs in-process; two-terminal local run  
+6. Tests: contracts + mocked client; optional `@pytest.mark.a2a` live smoke  
+
+### Concrete design (for Approve)
+
+**Smallest useful stack (learning):** thin HTTP + Agent Card JSON + JSON task API that carries our contracts — optionally wrap with `a2a-sdk` if it stays small; prefer **stdlib/httpx + FastAPI/Starlette** over pulling ADK. Full JSON-RPC A2A surface is welcome but not required if card + `POST /tasks/research` + lifecycle statuses meet the learning goal.
+
+```text
+src/shorts_assistant/
+  a2a_research/
+    contracts.py      # ResearchRequest / ResearchResponse
+    agent_card.py     # shorts_research_agent card JSON
+    server.py         # standalone process (demo research + optional MCP)
+    client.py         # HTTP client used by research_node
+  nodes.py            # if A2A enabled → client; else demo+MCP (today)
+```
+
+| Flag | Default | Behavior |
+|------|---------|----------|
+| `A2A_RESEARCH_ENABLED` | `false` | in-process research (CI parity) |
+| `A2A_RESEARCH_URL` | `http://127.0.0.1:9101` | peer base URL |
+| `A2A_TIMEOUT_SEC` | `30` | client timeout |
+| `A2A_RESEARCH_REQUIRED` | `false` | if true, A2A failure → FAILED; else degrade |
+
+- Map `ResearchResponse` → `state.research` (bullets + sources joined as text)  
+- Target package version **0.15.0**  
+- Marker: `@pytest.mark.a2a` (exclude from default CI like `llm`)  
 
 ---
 

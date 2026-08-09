@@ -4,19 +4,19 @@ overview: "Phase 14 introduces a config-driven ModelRouter that assigns models p
 todos:
   - id: p14-teach
     content: Compare direct SDK vs LiteLLM vs custom router; select custom; document trade-offs
-    status: pending
+    status: completed
   - id: p14-router
     content: Implement ModelRouter + settings for research/write/evaluate/visualize/format + fallbacks
-    status: pending
+    status: completed
   - id: p14-wire
     content: Wire all LLM nodes through router; default config preserves current model behavior
-    status: pending
+    status: completed
   - id: p14-metrics
     content: Log task/model/cost/latency; add eval compare helper for model A/B
-    status: pending
+    status: completed
   - id: p14-tests
     content: "Tests: parity defaults, per-task overrides, fallback resolution"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -35,6 +35,54 @@ isProject: false
 - Do **not** hardcode a single model string on every LLM node
 - Stay on LangGraph + Gemini (langchain-google-genai or google-genai); model IDs via ModelRouter
 - Single service; no model-routing microservice
+
+**Status:** Implemented locally as **0.14.0** (2026-08-05). Uncommitted until batch check (Phases 11–21).  
+**Commit policy:** batch code-check/commit for Phases 11–21 later (no commit until you ask).
+
+## Inspect findings (2026-08-05)
+
+| Area | Finding |
+|------|---------|
+| Config | Single `MODEL_NAME` / `settings.model_name` (default `gemini-2.0-flash-001`) — no `MODEL_RESEARCH` / `MODEL_WRITE` / … |
+| Live LLM call sites | **Only** `judge.try_live_judge` → `ChatGoogleGenerativeAI(model=settings.model_name)` |
+| Other graph nodes | Research / scriptwriter / visualizer / formatter use **demo producers** (no Gemini call yet) |
+| Router package | **Missing** — no `models/router.py`, no `TaskType`, no `RouteDecision` |
+| LiteLLM | Not in deps (correct for Gemini-only learning path) |
+| Failures (Phase 6) | Retries **same** model id; no availability fallback to alternate model |
+| Observability | Every log event stamps global `settings.model_name` — not task-scoped |
+| Eval | `compare.py` does run A/B; **no** `model_compare` helper keyed by write/evaluate model |
+| ADK archive | Also hardcoded `settings.model_name` per agent — ignore (archived) |
+
+### What already exists (reuse)
+
+- `MODEL_NAME` as **default primary** for all tasks (parity under defaults)  
+- Phase 6 `call_with_policy` + TRANSIENT retries (hook fallback model **after** retries or on 429/5xx class)  
+- Cost knobs `COST_PER_1M_*` already in settings  
+- Phase 8 eval compare pattern to extend for model A/B  
+
+### Gaps this phase must close
+
+1. `models/` package: `TaskType`, `RouteDecision`, `ModelRouter.resolve(task)`  
+2. Settings: `MODEL_{RESEARCH,WRITE,EVALUATE,VISUALIZE,FORMAT}` + `MODEL_FALLBACK` (default = today’s `MODEL_NAME`)  
+3. Wire live judge (and any future LLM factory) through router — keep demo path model-agnostic  
+4. Obs: log `task` + `route_reason` + resolved `model` on LLM calls  
+5. Small eval helper for model A/B measure (not auto-optimize)  
+6. Tests: default parity, override WRITE, fallback list, availability hook unit test  
+
+### Concrete design (for Approve)
+
+```text
+models/
+  types.py       # TaskType: research|write|evaluate|visualize|format
+  router.py      # ModelRouter.resolve(task) -> RouteDecision
+  registry.py    # map Settings → primary/fallbacks per task
+  factory.py     # optional: ChatGoogleGenerativeAI from RouteDecision (judge uses this)
+```
+
+- Keep `MODEL_NAME` as alias/default for all per-task fields (backward compatible)  
+- Target package version **0.14.0**  
+- **No LiteLLM** this phase  
+- Do **not** add live LLM to demo research/write nodes — only route wherever LLM is already (or will be) called  
 
 ---
 

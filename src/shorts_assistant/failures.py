@@ -130,13 +130,9 @@ def classify_exception(exc: BaseException) -> FailureClass:
         return FailureClass.PERMANENT
 
     text = _message(exc)
-    if re.search(
-        r"\b(429|rate.?limit|timeout|temporarily unavailable|econnreset)\b", text
-    ):
+    if re.search(r"\b(429|rate.?limit|timeout|temporarily unavailable|econnreset)\b", text):
         return FailureClass.TRANSIENT
-    if re.search(
-        r"\b(401|403|unauthorized|forbidden|invalid api key|api key)\b", text
-    ):
+    if re.search(r"\b(401|403|unauthorized|forbidden|invalid api key|api key)\b", text):
         return FailureClass.PERMANENT
 
     # Unknown at a node boundary = programming/invariant, not worth retrying.
@@ -178,9 +174,7 @@ def _run_with_timeout(fn: Callable[[], T], timeout_seconds: float) -> T:
             return future.result(timeout=timeout_seconds)
         except FuturesTimeoutError as exc:
             future.cancel()
-            raise TimeoutError(
-                f"call exceeded timeout of {timeout_seconds}s"
-            ) from exc
+            raise TimeoutError(f"call exceeded timeout of {timeout_seconds}s") from exc
 
 
 def call_with_policy(

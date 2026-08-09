@@ -4,22 +4,22 @@ overview: "Phase 16 exposes a FastAPI job API (202 + status/result/approve/revis
 todos:
   - id: p16-teach
     content: Explain sync vs async APIs, job, worker, queue, idempotency, retries, status tracking
-    status: pending
+    status: completed
   - id: p16-jobs
     content: Add jobs table + enqueue/claim/complete with SKIP LOCKED and idempotency_key
-    status: pending
+    status: completed
   - id: p16-api
     content: "FastAPI: POST /shorts 202, GET status/result, POST approve/revise + API_KEY"
-    status: pending
+    status: completed
   - id: p16-worker
     content: "Worker process: claim jobs, run/resume LangGraph pipeline, update status"
-    status: pending
+    status: completed
   - id: p16-tests
     content: API and worker tests without live LLM
-    status: pending
+    status: completed
   - id: p16-docs
     content: "README: run uvicorn + worker locally; no Kubernetes"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -39,6 +39,68 @@ isProject: false
 - Do **not** require a new microservice repo; modular monolith (API + worker share code)
 - Queue: **PostgreSQL-backed jobs** (fits Phase 10; avoids Redis/K8s for this phase)
 - Depends on: persistence, HITL approve/revise, workflow_id / execution ids, runner split
+
+**Status:** Implemented locally as **0.16.0** (2026-08-05). Uncommitted until batch check (Phases 11–21).  
+**Commit policy:** batch code-check/commit for Phases 11–21 later (no commit until you ask).
+
+## Inspect findings (2026-08-05)
+
+| Area | Finding |
+|------|---------|
+| FastAPI / uvicorn | **Missing** from deps and code |
+| `api/` / `worker/` packages | **Missing** |
+| Jobs table | **Missing** — no enqueue/claim/SKIP LOCKED |
+| Auth `API_KEY` | **Missing** |
+| Persistence today | `workflows` + `executions` + checkpoint JSON (Phase 10) — reusable |
+| Runner | `run_until_human` / `resume_with_decision` ready for worker bridge |
+| HITL CLI | `approve` exists; no HTTP approve/revise yet |
+| Entry today | Sync CLI `python -m shorts_assistant` blocks until COMPLETED/AWAITING_HUMAN |
+| Dockerfile | Still ADK-era `adk web` CMD — out of scope to fully fix in 16 (note only) |
+| CI DB | Default SQLite — SKIP LOCKED is PG-native; need SQLite-safe claim for tests |
+
+### What already exists (reuse)
+
+- `WorkflowRepository.create_workflow` / `start_execution` / checkpoint / finish  
+- HITL resume by `execution_id` + checkpointer `thread_id`  
+- Failure taxonomy (Phase 6) for worker retry vs permanent fail  
+- Obs `trace_id` / `execution_id` for API status payloads  
+
+### Gaps this phase must close
+
+1. Alembic `jobs` table + repository (`enqueue` / `claim` / `complete` / idempotency)  
+2. FastAPI app: `POST /shorts` 202, GET status, GET result, POST approve/revise  
+3. `API_KEY` dependency on mutating routes (and ideally all)  
+4. Worker poll loop → `run_until_human` / `resume_with_decision`  
+5. Map job + execution status → API status enum  
+6. Tests with TestClient/httpx; README two-process local run  
+7. Target version **0.16.0**  
+
+### Concrete design (for Approve)
+
+```text
+src/shorts_assistant/
+  api/
+    app.py            # FastAPI factory + routes
+    schemas.py        # CreateShortRequest, StatusResponse, …
+    auth.py           # X-API-Key / API_KEY check
+  worker/
+    main.py           # poll loop CLI
+    bridge.py         # run_until_human / resume_with_decision
+  persistence/
+    jobs.py           # JobRow helpers OR models + repository methods
+```
+
+| Flag / setting | Default | Purpose |
+|----------------|---------|---------|
+| `API_KEY` | required when API runs | Auth header `X-API-Key` |
+| `WORKER_POLL_SEC` | `1.0` | Poll interval |
+| `JOB_MAX_ATTEMPTS` | `3` | Transient retries |
+
+**Claim strategy:** Postgres → `FOR UPDATE SKIP LOCKED`; SQLite/tests → atomic `UPDATE … WHERE status='queued' LIMIT 1` (good enough for single local worker).  
+
+**Id mapping:** API `workflow_id` = Phase 10 `workflows.id`; worker stores `execution_id` on job/execution for HITL resume.  
+
+**Status mapping:** job `queued|running` + execution `AWAITING_HUMAN|COMPLETED|FAILED` → API `queued|running|awaiting_human|succeeded|failed`.
 
 ---
 

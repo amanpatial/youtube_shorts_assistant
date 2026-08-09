@@ -37,9 +37,7 @@ def compare_summaries(
     base_mode = base_summary.get("mode")
     cand_mode = cand_summary.get("mode")
     if base_mode != cand_mode:
-        raise ModeMismatchError(
-            f"mode mismatch: baseline={base_mode!r} candidate={cand_mode!r}"
-        )
+        raise ModeMismatchError(f"mode mismatch: baseline={base_mode!r} candidate={cand_mode!r}")
 
     deltas: dict[str, Any] = {}
     for key in DELTA_KEYS:
@@ -63,3 +61,34 @@ def compare_summaries(
 def compare_files(baseline_path: str | Path, candidate_path: str | Path) -> dict[str, Any]:
     """Purpose: load two artifacts and return compare payload."""
     return compare_summaries(load_artifact(baseline_path), load_artifact(candidate_path))
+
+
+def model_compare(
+    baseline: dict[str, Any],
+    candidate: dict[str, Any],
+) -> dict[str, Any]:
+    """Purpose: Phase 14 helper — quality/cost/latency deltas + model map.
+
+    Does not auto-optimize; only measures candidate vs baseline when A/B'ing
+    ``MODEL_WRITE`` / ``MODEL_EVALUATE`` (or related) configs.
+    """
+    base = compare_summaries(baseline, candidate)
+    base_summary = baseline.get("summary") or baseline
+    cand_summary = candidate.get("summary") or candidate
+    return {
+        **base,
+        "kind": "model_compare",
+        "baseline_models": base_summary.get("task_models")
+        or {"default": base_summary.get("model_name")},
+        "candidate_models": cand_summary.get("task_models")
+        or {"default": cand_summary.get("model_name")},
+        "baseline_avg_latency_ms": base_summary.get("average_latency_ms"),
+        "candidate_avg_latency_ms": cand_summary.get("average_latency_ms"),
+        "baseline_est_cost_usd": base_summary.get("estimated_cost_usd"),
+        "candidate_est_cost_usd": cand_summary.get("estimated_cost_usd"),
+    }
+
+
+def model_compare_files(baseline_path: str | Path, candidate_path: str | Path) -> dict[str, Any]:
+    """Purpose: load two artifacts and return model_compare payload."""
+    return model_compare(load_artifact(baseline_path), load_artifact(candidate_path))

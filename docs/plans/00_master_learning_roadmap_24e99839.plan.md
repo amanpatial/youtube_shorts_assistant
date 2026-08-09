@@ -3,7 +3,7 @@ name: Master Learning Roadmap
 overview: "Master index: LangGraph-only active stack; ADK archived (not mixed). Per-phase approval loop; phases 01–21; plans live in docs/plans for later git push. Do not implement autonomously."
 todos:
   - id: current-phase
-    content: "Phase 10 implement complete (0.10.0). Next: Start Phase 11 — Inspect (RAG/memory) when ready."
+    content: "Phase 18 Inspect complete. Next: Approve Phase 18 design — implement when ready. Batch code-check/commit for 11–21 later."
     status: completed
   - id: archive-adk
     content: "ADK archived under archive/adk_baseline/; google-adk removed from active deps; LangGraph sole active runtime"
@@ -98,8 +98,8 @@ Cursor must **not** implement the roadmap autonomously.
 | Item | Value |
 |------|--------|
 | **Framework strategy** | LangGraph-only; ADK → archive |
-| **Active phase** | Phase 10 complete (0.10.0) — persistent state |
-| **Next step** | **Start Phase 11 — Inspect** (RAG/memory) when ready |
+| **Active phase** | Phase 21 — ADR implemented locally (0.21.0); roadmap Phases 1–21 complete |
+| **Next step** | **Batch code-check/commit Phases 11–21** (when you ask) |
 | **ADK code archived on disk?** | Yes — `archive/adk_baseline/` |
 | **Solution architecture** | [docs/architecture/solution_architecture.md](../architecture/solution_architecture.md) |
 | **Phase 6** | Complete (0.6.0) — taxonomy + scoped LLM retries |

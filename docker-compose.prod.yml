@@ -1,0 +1,94 @@
+# Production-shaped stack (Phase 19): migrate → api + worker.
+# Optional local Postgres: docker compose -f docker-compose.prod.yml --profile local-db up --build
+#
+# Managed Postgres (recommended for real staging/prod): set DATABASE_URL in .env and omit local-db.
+
+services:
+  postgres:
+    profiles: ["local-db"]
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: shorts
+      POSTGRES_PASSWORD: shorts
+      POSTGRES_DB: shorts
+    ports:
+      - "5432:5432"
+    volumes:
+      - shorts-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shorts -d shorts"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://shorts:shorts@postgres:5432/shorts}
+      APP_ENV: ${APP_ENV:-staging}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: "no"
+
+  api:
+    build: .
+    command:
+      [
+        "uvicorn",
+        "shorts_assistant.api.app:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8080",
+      ]
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://shorts:shorts@postgres:5432/shorts}
+      APP_ENV: ${APP_ENV:-staging}
+      CHECKPOINT_BACKEND: ${CHECKPOINT_BACKEND:-memory}
+      HITL_REQUIRED: ${HITL_REQUIRED:-true}
+      LOG_PAYLOADS: ${LOG_PAYLOADS:-false}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    stop_grace_period: 60s
+
+  worker:
+    build: .
+    command: ["python", "-m", "shorts_assistant.worker"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://shorts:shorts@postgres:5432/shorts}
+      APP_ENV: ${APP_ENV:-staging}
+      CHECKPOINT_BACKEND: ${CHECKPOINT_BACKEND:-memory}
+      HITL_REQUIRED: ${HITL_REQUIRED:-true}
+      LOG_PAYLOADS: ${LOG_PAYLOADS:-false}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 120s
+    restart: unless-stopped
+
+volumes:
+  shorts-pg:

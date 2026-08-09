@@ -23,9 +23,7 @@ class QualityCriteria(BaseModel):
     min_overall_score: float = Field(ge=0, le=10)
     require_approved: bool = False
     max_duration_seconds: float = Field(default=60, gt=0)
-    must_include_sections: list[str] = Field(
-        default_factory=lambda: ["hook", "body", "cta"]
-    )
+    must_include_sections: list[str] = Field(default_factory=lambda: ["hook", "body", "cta"])
 
 
 class EvalCase(BaseModel):

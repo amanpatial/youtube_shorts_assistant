@@ -11,11 +11,19 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 
 _prefer_live_judge: ContextVar[bool] = ContextVar("prefer_live_judge", default=False)
+_memory_retrieval_override: ContextVar[bool | None] = ContextVar(
+    "memory_retrieval_override", default=None
+)
 
 
 def prefer_live_judge() -> bool:
     """Purpose: whether evaluator_node should call Gemini for this invoke."""
     return _prefer_live_judge.get()
+
+
+def memory_retrieval_enabled() -> bool | None:
+    """Purpose: eval override for MEMORY_RETRIEVAL; None → use settings."""
+    return _memory_retrieval_override.get()
 
 
 @contextmanager
@@ -26,3 +34,13 @@ def live_judge_mode(enabled: bool = True) -> Iterator[None]:
         yield
     finally:
         _prefer_live_judge.reset(token)
+
+
+@contextmanager
+def memory_retrieval_mode(enabled: bool) -> Iterator[None]:
+    """Purpose: force memory retrieval on/off for an eval A/B run."""
+    token = _memory_retrieval_override.set(enabled)
+    try:
+        yield
+    finally:
+        _memory_retrieval_override.reset(token)

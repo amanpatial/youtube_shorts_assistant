@@ -149,13 +149,9 @@ def test_evaluation_linked_and_finish(sqlite_url):
         wf = repo.create_workflow("eval")
         ex = repo.start_execution(wf, trace_id="wf_e")
         sv = repo.add_script_version(ex, iteration=1, script=script, is_best=True)
-        ev = repo.add_evaluation(
-            ex, script_version_id=sv, evaluation=evaluation, iteration=1
-        )
+        ev = repo.add_evaluation(ex, script_version_id=sv, evaluation=evaluation, iteration=1)
         repo.finish_execution(ex, final_status="COMPLETED")
         assert ev
-        row = session.execute(
-            text("SELECT final_status, finished_at FROM executions")
-        ).one()
+        row = session.execute(text("SELECT final_status, finished_at FROM executions")).one()
         assert row[0] == "COMPLETED"
         assert row[1] is not None
