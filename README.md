@@ -212,7 +212,7 @@ Thresholds live in [`evals/quality_gate.yaml`](evals/quality_gate.yaml). Gate **
 
 - Set repo secret `GOOGLE_API_KEY` for optional `live_judge` jobs.
 - Fork PRs never receive that secret; live_judge is skipped (demo gate still runs on path/label triggers).
-- Pushing workflow files may need a GitHub token with `workflow` scope (see [`.github/README.md`](.github/README.md)).
+- Pushing workflow files may need a GitHub token with `workflow` scope (`repo` + `workflow`).
 
 ## Offline evaluation (Phase 8)
 
