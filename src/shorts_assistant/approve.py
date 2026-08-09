@@ -52,7 +52,16 @@ def main(argv: list[str] | None = None) -> int:
             reviewer=args.reviewer,
         )
     except Exception as exc:  # noqa: BLE001 — CLI surface
+        msg = str(exc)
         print(f"error: {exc}", file=sys.stderr)
+        if "Field required" in msg or "input_value={}" in msg:
+            print(
+                "\nHint: LangGraph checkpoint was empty. Cross-process HITL needs a durable "
+                "checkpointer (CHECKPOINT_BACKEND=sqlite|postgres). "
+                "memory does not survive a new approve process. "
+                "Re-run the pause step, then approve again.",
+                file=sys.stderr,
+            )
         return 1
 
     print(json.dumps(final.to_dict(), indent=2))

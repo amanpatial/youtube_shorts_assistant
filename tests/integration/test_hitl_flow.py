@@ -70,6 +70,46 @@ def test_hitl_request_changes_then_approve(hitl_env):
     assert final.human_decision == "approve"
 
 
+def test_hitl_sqlite_survives_checkpointer_reopen(tmp_path, monkeypatch):
+    """Purpose: CLI-style pause then approve after dropping in-process saver cache."""
+    db = tmp_path / "hitl_sqlite.db"
+    ckpt = tmp_path / "checkpoints.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{db}")
+    monkeypatch.setenv("CHECKPOINT_BACKEND", "sqlite")
+    monkeypatch.setenv("CHECKPOINT_SQLITE_PATH", str(ckpt))
+    monkeypatch.setenv("HITL_REQUIRED", "true")
+    get_settings.cache_clear()
+    reset_engine_cache()
+    reset_checkpointer_for_tests()
+    import shorts_assistant.checkpointer as cp
+    import shorts_assistant.config as cfg
+    import shorts_assistant.hitl as hitl
+    import shorts_assistant.persistence.session as sess
+
+    s = get_settings()
+    monkeypatch.setattr(cfg, "settings", s)
+    monkeypatch.setattr(sess, "settings", s)
+    monkeypatch.setattr(cp, "settings", s)
+    monkeypatch.setattr(hitl, "settings", s)
+    ensure_schema()
+
+    paused = run_until_human("HITL sqlite reopen topic")
+    assert paused.status == WorkflowStatus.AWAITING_HUMAN
+    assert paused.execution_id
+    assert ckpt.is_file()
+
+    # Simulate a new CLI process: drop cached SqliteSaver, reopen same file.
+    reset_checkpointer_for_tests()
+    s2 = get_settings()
+    monkeypatch.setattr(cfg, "settings", s2)
+    monkeypatch.setattr(cp, "settings", s2)
+    monkeypatch.setattr(hitl, "settings", s2)
+
+    final = resume_with_decision(paused.execution_id, decision="approve")
+    assert final.status == WorkflowStatus.COMPLETED
+    assert final.final_short_concept is not None
+
+
 def test_hitl_disabled_auto_approves(tmp_path, monkeypatch):
     db = tmp_path / "nohitl.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{db}")

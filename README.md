@@ -7,7 +7,7 @@ Agentic **LangGraph** application that turns a topic into a structured Shorts co
 | | |
 |--|--|
 | **Version** | **0.23.0** (Phases **1–23** — live `sales_brief` pack) |
-| **Active stack** | LangGraph — [`src/shorts_assistant/`](src/shorts_assistant/) |
+| **Active stack** | LangGraph + Gemini + FastAPI — see [Technical stack](#technical-stack) |
 | **ADK experiment** | Archived — [`archive/adk_baseline/`](archive/adk_baseline/) (not a second runtime) |
 | **ADR** | [0001 — LangGraph-only](docs/adr/0001-primary-orchestration-framework.md) |
 | **Architecture** | [`docs/architecture/solution_architecture.md`](docs/architecture/solution_architecture.md) |
@@ -61,6 +61,30 @@ Agentic **LangGraph** application that turns a topic into a structured Shorts co
 
 **Learning roadmap 1–21 complete; Phases 22–23 add accelerator packs.** Default `PACK_ID=youtube_shorts`.
 
+## Technical stack
+
+| Layer | Choice |
+|-------|--------|
+| **Language** | Python **3.11+** (3.12 recommended) |
+| **Orchestration** | **LangGraph** (`StateGraph`, conditional edges, `interrupt` / `Command(resume=…)`) — ADR 0001 |
+| **LLM** | Google **Gemini** via `langchain-google-genai` (default `gemini-2.0-flash-001`); API key or Vertex ADC |
+| **Contracts / config** | **Pydantic** v2 + **pydantic-settings** (typed state, schemas, `.env`) |
+| **Domain DB** | **SQLAlchemy** 2.x + **Alembic** — SQLite local (`data/shorts.db`) or Postgres |
+| **LG checkpointer** | **SqliteSaver** default (`data/checkpoints.sqlite`); `MemorySaver` for tests; `PostgresSaver` optional |
+| **Long-term memory** | Custom SQL RAG (`memory_items` + embeddings) — not LangGraph Store |
+| **HTTP API** | **FastAPI** + **Uvicorn** (202 jobs, `/healthz`, `/readyz`) |
+| **Worker** | Same-repo poller → `run_until_human` / `resume_with_decision` |
+| **Tools** | **MCP** (`mcp` SDK) — read-only `shorts_catalog` stdio server |
+| **A2A** | Lightweight HTTP research peer (`a2a_research/`, opt-in) |
+| **Observability** | Structured JSON logs + `trace_id`; optional OpenTelemetry |
+| **Security** | API keys, rate limit, input fence/heuristics, output policy, redaction |
+| **Eval / CI** | Offline datasets + `eval_gate`; GitHub Actions (`ci`, `ai-eval`, `nightly-eval`) |
+| **Packaging / deploy** | `Dockerfile`, `docker-compose.prod.yml` (migrate + api + worker) |
+| **Dev / quality** | pytest, ruff, pyright, pip-audit, gitleaks |
+| **Archived** | Google ADK baseline under `archive/adk_baseline/` (not imported at runtime) |
+
+Primary packages: see [`requirements.txt`](requirements.txt) / [`requirements-dev.txt`](requirements-dev.txt).
+
 ## Pipeline
 
 ```text
@@ -111,6 +135,8 @@ Default `HITL_REQUIRED=false` so CI/eval never hang. For interactive pause/resum
 
 ```bash
 export HITL_REQUIRED=true
+# Needs durable checkpointer (default CHECKPOINT_BACKEND=sqlite).
+# CHECKPOINT_BACKEND=memory only works if pause+approve share one process.
 python -m shorts_assistant "Topic for review"   # exit 3 when AWAITING_HUMAN
 
 python -m shorts_assistant.approve <execution_id> approve
@@ -135,7 +161,8 @@ See [`.env.example`](.env.example).
 | `LOG_LEVEL` / `LOG_PAYLOADS` | Logging; keep payloads off by default |
 | `ENABLE_OTEL` | Opt-in OpenTelemetry |
 | `DATABASE_URL` | Domain DB (default SQLite `./data/shorts.db`) |
-| `CHECKPOINT_BACKEND` | `memory` (default) or `postgres` |
+| `CHECKPOINT_BACKEND` | `sqlite` (default, durable), `memory` (ephemeral), or `postgres` |
+| `CHECKPOINT_SQLITE_PATH` | SqliteSaver file (default `data/checkpoints.sqlite`) |
 | `CHECKPOINT_POSTGRES_URL` | Optional Postgres URL for LG checkpointer |
 | `LLM_*` / `LIVE_JUDGE_FALLBACK` | Live-call timeouts, retries, fallback |
 | `MEMORY_RETRIEVAL` | Inject past Shorts context (default `true`) |
@@ -441,10 +468,13 @@ OpenTelemetry is opt-in (`ENABLE_OTEL=true`). Do not use archived ADK `telemetry
 
 ## Persistence (Phase 10)
 
-Two stores, one process:
+Two stores, one process (local defaults under `data/`):
 
-1. **LangGraph checkpointer** — step resume via `thread_id=execution_id` (`MemorySaver` default; `PostgresSaver` optional)  
-2. **Domain DB** — audit/history: `workflows`, `executions`, `script_versions`, `evaluations`, `agent_executions`
+1. **LangGraph checkpointer** — step resume via `thread_id=execution_id`  
+   - Default: **SqliteSaver** → `data/checkpoints.sqlite` (CLI HITL across processes)  
+   - `CHECKPOINT_BACKEND=memory` → ephemeral (tests / single process only)  
+   - `CHECKPOINT_BACKEND=postgres` → `PostgresSaver`  
+2. **Domain DB** (`DATABASE_URL`, default `data/shorts.db`) — `workflows`, `executions`, `script_versions`, `evaluations`, `agent_executions`, `jobs`, **`memory_items`** (RAG)
 
 ```bash
 # Migrations (prod/deploy). Local SQLite also auto-creates tables on first run.

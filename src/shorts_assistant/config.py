@@ -61,7 +61,13 @@ class Settings(BaseSettings):
         alias="SESSION_DB_URL",
         description="Deprecated alias for DATABASE_URL (ADK-era name).",
     )
-    checkpoint_backend: str = Field(default="memory", alias="CHECKPOINT_BACKEND")
+    # sqlite = durable local LG checkpoints (CLI HITL across processes); memory = ephemeral
+    checkpoint_backend: str = Field(default="sqlite", alias="CHECKPOINT_BACKEND")
+    checkpoint_sqlite_path: str = Field(
+        default="",
+        alias="CHECKPOINT_SQLITE_PATH",
+        description="Path for SqliteSaver; empty → <repo>/data/checkpoints.sqlite",
+    )
     checkpoint_postgres_url: str = Field(default="", alias="CHECKPOINT_POSTGRES_URL")
     max_input_length: int = Field(default=2000, alias="MAX_INPUT_LENGTH")
     enable_otel: bool = Field(default=False, alias="ENABLE_OTEL")
