@@ -1,6 +1,8 @@
 # YouTube Shorts Assistant
 
-LangGraph learning project that turns a developer-focused idea into a YouTube Short concept — with typed state, a quality loop, offline eval, observability, and durable persistence.
+Agentic **LangGraph** application that turns a topic into a structured Shorts concept (or a sales brief via packs) through a multi-node agent pipeline — not a single prompt.
+
+> Agentic LangGraph app: multi-node Shorts pipeline with typed state, AI judge quality loop, HITL, memory/RAG, MCP tools, model routing, A2A research, async API/worker, security guardrails, eval gates, and swappable vertical packs.
 
 | | |
 |--|--|
@@ -10,6 +12,24 @@ LangGraph learning project that turns a developer-focused idea into a YouTube Sh
 | **ADR** | [0001 — LangGraph-only](docs/adr/0001-primary-orchestration-framework.md) |
 | **Architecture** | [`docs/architecture/solution_architecture.md`](docs/architecture/solution_architecture.md) |
 | **Phase plans** | [`docs/plans/`](docs/plans/) |
+
+## Key capabilities
+
+| Capability | What it does |
+|------------|--------------|
+| **Multi-node agent graph** | Research → memory → write ↔ evaluate ↔ quality gate → HITL → (visuals) → format |
+| **Typed contracts** | Pydantic state + schemas; fail-closed between nodes |
+| **AI-as-judge loop** | Synthetic/live evaluation, PASS / RETRY / EXHAUSTED with best-so-far |
+| **Human-in-the-loop** | LangGraph `interrupt` / resume (`approve`, `reject`, `request_changes`) |
+| **Memory / RAG** | Retrieve past wins into context; persist after strong runs |
+| **MCP tools** | Read-only `shorts_catalog` server + allowlisted client |
+| **Model routing** | Per-task model selection + fallbacks (no LiteLLM) |
+| **A2A research peer** | Optional HTTP research agent (agent card + task API) |
+| **Async jobs** | FastAPI 202 + SQL job table + worker → graph run/resume |
+| **Security** | API key authz, rate limits, input/output guards, redaction |
+| **Eval + AI CI** | Offline datasets, quality gate vs baseline, GitHub Actions |
+| **Ops** | Checkpointer, traces, Docker Compose prod, health/ready probes |
+| **Vertical packs** | `PACK_ID` selects live graph — Pack 0 Shorts (default) or `sales_brief` |
 
 ## What’s built (Phases 1–23)
 
@@ -36,8 +56,8 @@ LangGraph learning project that turns a developer-focused idea into a YouTube Sh
 | 19 | Production deploy | `Dockerfile`, `docker-compose.prod.yml`, `/healthz` `/readyz` |
 | 20 | LG parity / hardening | `graph_ops.py`, ADK→LG map, stream + state history |
 | 21 | ADR LangGraph-only | [`docs/adr/0001-…`](docs/adr/0001-primary-orchestration-framework.md) + [comparison](docs/architecture/adk_vs_langgraph.md) |
-| 22 | GTM vertical packs | `packs/` registry — Pack 0 Shorts + `sales_brief` stub |
-| 23 | Live `sales_brief` pack | Pack graph + `PACK_ID` dispatch; Shorts remains default |
+| 22 | GTM vertical packs | `packs/` registry + Pack 0 Shorts + stub → live in 23 |
+| 23 | Live `sales_brief` pack | Pack-local graph + `PACK_ID` dispatch; Shorts remains default |
 
 **Learning roadmap 1–21 complete; Phases 22–23 add accelerator packs.** Default `PACK_ID=youtube_shorts`.
 
