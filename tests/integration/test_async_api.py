@@ -146,9 +146,55 @@ def test_worker_runs_to_succeeded(api_env):
     st = client.get(f"/shorts/{wid}", headers=_headers()).json()
     assert st["status"] == "succeeded"
     assert st["execution_id"]
+    agents = {row["id"]: row["state"] for row in st["agents"]}
+    assert agents["research"] == "done"
+    assert agents["formatter"] == "done"
+    assert len(st["agents"]) == 8
     res = client.get(f"/shorts/{wid}/result", headers=_headers())
     assert res.status_code == 200
-    assert res.json()["final_short_concept"] is not None
+    body = res.json()
+    assert body["final_short_concept"] is not None
+    assert body["generated_script"] is not None
+    assert body["research"]
+    assert body["evaluation"] is not None
+    assert body["evaluation"]["overall_score"] is not None
+    assert body["visual_concepts"] is not None
+    assert body["visual_concepts"]["shots"]
+
+
+def test_list_shorts_owner_scoped(api_env):
+    client = api_env
+    a = client.post(
+        "/shorts",
+        json={"topic": "Owner A topic"},
+        headers=_headers("test-secret", idem="list-a"),
+    ).json()["workflow_id"]
+    b = client.post(
+        "/shorts",
+        json={"topic": "Owner B topic"},
+        headers=_headers("other-secret", idem="list-b"),
+    ).json()["workflow_id"]
+
+    mine = client.get("/shorts?limit=20", headers=_headers("test-secret"))
+    assert mine.status_code == 200
+    ids = [row["workflow_id"] for row in mine.json()["items"]]
+    assert a in ids
+    assert b not in ids
+    assert mine.json()["items"][0]["topic"]
+
+
+def test_cors_preflight_allows_vite_origin(api_env):
+    client = api_env
+    r = client.options(
+        "/shorts",
+        headers={
+            "Origin": "http://127.0.0.1:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-api-key",
+        },
+    )
+    assert r.status_code in {200, 204}
+    assert r.headers.get("access-control-allow-origin") == "http://127.0.0.1:5173"
 
 
 def test_approve_when_awaiting(api_env, monkeypatch):

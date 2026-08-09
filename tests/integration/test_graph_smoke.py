@@ -7,7 +7,7 @@ from shorts_assistant.state import WorkflowState, WorkflowStatus
 
 
 def test_package_version():
-    assert __version__ == "0.23.0"
+    assert __version__ == "0.24.0"
 
 
 def test_build_graph_compiles():

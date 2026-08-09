@@ -37,3 +37,7 @@ data/*
 .vscode/
 .DS_Store
 *.swp
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

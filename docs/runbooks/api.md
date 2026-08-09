@@ -43,6 +43,15 @@ curl -sS http://127.0.0.1:8000/readyz
 
 Without the worker, jobs stay `queued` forever.
 
+**Web UI** (Phase 24) — third terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+# http://127.0.0.1:5173 — Settings → API_KEY → Create / History / run detail (agent pipeline)
+```
+
 ---
 
 ## Auth
@@ -65,10 +74,13 @@ Base URL: `http://127.0.0.1:8000`
 | Method | Path | Status | Purpose |
 |--------|------|--------|---------|
 | `POST` | `/shorts` | **202** | Enqueue a Shorts pipeline job |
-| `GET` | `/shorts/{workflow_id}` | 200 | Job / run status |
-| `GET` | `/shorts/{workflow_id}/result` | 200 | Final concept (409 if not ready) |
+| `GET` | `/shorts` | 200 | List this API key’s runs (`limit`, `offset`) |
+| `GET` | `/shorts/{workflow_id}` | 200 | Status + `agents` pipeline |
+| `GET` | `/shorts/{workflow_id}/result` | 200 | Research, eval, script, visuals, concept (409 if not ready) |
 | `POST` | `/shorts/{workflow_id}/approve` | **202** | Enqueue HITL approve |
 | `POST` | `/shorts/{workflow_id}/revise` | **202** | Enqueue HITL reject / request_changes |
+
+Browser UI (Vite): [`../../frontend/README.md`](../../frontend/README.md). CORS allowlist: `CORS_ORIGINS` (default `http://127.0.0.1:5173,http://localhost:5173`).
 
 Common errors: **401** missing/invalid key · **403** wrong owner · **404** unknown workflow · **409** result/HITL not ready · **422** output policy · **429** rate limit.
 
@@ -134,20 +146,31 @@ Idempotency-Key: unique-per-new-run   # optional; reuse returns same workflow_id
 
 `status` values: `queued` · `running` · `awaiting_human` · `succeeded` · `failed` · `cancelled`
 
+`agents` is the Shorts graph (research → … → formatter). Each step has `state`: `pending` · `running` · `paused` · `done` · `failed`.
+
 ---
 
 ### `GET /shorts/{workflow_id}/result` — result
 
 **Headers:** `X-API-Key: dev-change-me`
 
-**Response (200)** when finished:
+**Response (200)** when finished (or paused at HITL):
 
 ```json
 {
   "workflow_id": "...",
   "status": "succeeded",
-  "final_short_concept": { "...": "..." },
-  "generated_script": { "...": "..." }
+  "execution_id": "...",
+  "trace_id": "wf_...",
+  "research": "...",
+  "memory_context": "...",
+  "evaluation": { "overall_score": 8.5, "approved": true, "summary": "..." },
+  "generated_script": { "title": "...", "hook": "...", "sections": [] },
+  "visual_concepts": { "shots": [], "pacing": "..." },
+  "final_short_concept": { "hook": "...", "script_and_visuals": [], "cta": "..." },
+  "human_decision": "approve",
+  "script_version": 1,
+  "max_iterations": 3
 }
 ```
 

@@ -1,0 +1,39 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1419;
+  --panel: #1a222c;
+  --border: #2c3a4a;
+  --text: #e8eef4;
+  --muted: #8fa3b8;
+  --accent: #3d9cf0;
+  --ok: #3ecf8e;
+  --warn: #e6b84d;
+  --bad: #ef6b6b;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}

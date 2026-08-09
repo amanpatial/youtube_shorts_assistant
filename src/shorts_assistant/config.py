@@ -118,6 +118,12 @@ class Settings(BaseSettings):
     )
     worker_poll_sec: float = Field(default=1.0, alias="WORKER_POLL_SEC", gt=0)
     job_max_attempts: int = Field(default=3, alias="JOB_MAX_ATTEMPTS", ge=1, le=20)
+    # Phase 24: browser UI (Vite default ports)
+    cors_origins: str = Field(
+        default="http://127.0.0.1:5173,http://localhost:5173",
+        alias="CORS_ORIGINS",
+        description="Comma-separated allowed Origins for the web UI",
+    )
 
     # Phase 17: security / guardrails
     api_rate_limit_per_min: int = Field(default=30, alias="API_RATE_LIMIT_PER_MIN", ge=1, le=10_000)
@@ -172,6 +178,10 @@ class Settings(BaseSettings):
             raise ValueError("API_KEY or API_KEYS is required when APP_ENV is staging/production.")
 
         self.validate_for_runtime()
+
+    def cors_origin_list(self) -> list[str]:
+        """Purpose: parse CORS_ORIGINS into a FastAPI allowlist."""
+        return [part.strip() for part in (self.cors_origins or "").split(",") if part.strip()]
 
 
 @lru_cache

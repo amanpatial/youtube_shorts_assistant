@@ -6,7 +6,7 @@ Agentic **LangGraph** application that turns a topic into a structured Shorts co
 
 | | |
 |--|--|
-| **Version** | **0.23.0** (Phases **1–23** — live `sales_brief` pack) |
+| **Version** | **0.24.0** (Phases **1–24** — web UI for Shorts API) |
 | **Active stack** | LangGraph + Gemini + FastAPI — see [Technical stack](#technical-stack) |
 | **ADK experiment** | Archived — [`archive/adk_baseline/`](archive/adk_baseline/) (not a second runtime) |
 | **ADR** | [0001 — LangGraph-only](docs/adr/0001-primary-orchestration-framework.md) |
@@ -26,12 +26,13 @@ Agentic **LangGraph** application that turns a topic into a structured Shorts co
 | **Model routing** | Per-task model selection + fallbacks (no LiteLLM) |
 | **A2A research peer** | Optional HTTP research agent (agent card + task API) |
 | **Async jobs** | FastAPI 202 + SQL job table + worker → graph run/resume |
+| **Web UI** | React + Vite SPA (`frontend/`) — create, history, agent pipeline, HITL |
 | **Security** | API key authz, rate limits, input/output guards, redaction |
 | **Eval + AI CI** | Offline datasets, quality gate vs baseline, GitHub Actions |
 | **Ops** | Checkpointer, traces, Docker Compose prod, health/ready probes |
 | **Vertical packs** | `PACK_ID` selects live graph — Pack 0 Shorts (default) or `sales_brief` |
 
-## What’s built (Phases 1–23)
+## What’s built (Phases 1–24)
 
 | Phase | Focus | In the repo |
 |------:|-------|-------------|
@@ -58,8 +59,9 @@ Agentic **LangGraph** application that turns a topic into a structured Shorts co
 | 21 | ADR LangGraph-only | [`docs/adr/0001-…`](docs/adr/0001-primary-orchestration-framework.md) + [comparison](docs/architecture/adk_vs_langgraph.md) |
 | 22 | GTM vertical packs | `packs/` registry + Pack 0 Shorts + stub → live in 23 |
 | 23 | Live `sales_brief` pack | Pack-local graph + `PACK_ID` dispatch; Shorts remains default |
+| 24 | Web UI + richer API | `frontend/` Vite React; CORS; `GET /shorts` list; result + agent pipeline |
 
-**Learning roadmap 1–21 complete; Phases 22–23 add accelerator packs.** Default `PACK_ID=youtube_shorts`.
+**Learning roadmap 1–21 complete; Phases 22–24 add accelerator + UI.** Default `PACK_ID=youtube_shorts`.
 
 ## Technical stack
 
@@ -72,7 +74,8 @@ Agentic **LangGraph** application that turns a topic into a structured Shorts co
 | **Domain DB** | **SQLAlchemy** 2.x + **Alembic** — SQLite local (`data/shorts.db`) or Postgres |
 | **LG checkpointer** | **SqliteSaver** default (`data/checkpoints.sqlite`); `MemorySaver` for tests; `PostgresSaver` optional |
 | **Long-term memory** | Custom SQL RAG (`memory_items` + embeddings) — not LangGraph Store |
-| **HTTP API** | **FastAPI** + **Uvicorn** (202 jobs, `/healthz`, `/readyz`) |
+| **HTTP API** | **FastAPI** + **Uvicorn** (202 jobs, list/status/result, CORS, agent pipeline) |
+| **Web UI** | **React 19** + **Vite 6** (`frontend/`, hash routes, API-key in localStorage) |
 | **Worker** | Same-repo poller → `run_until_human` / `resume_with_decision` |
 | **Tools** | **MCP** (`mcp` SDK) — read-only `shorts_catalog` stdio server |
 | **A2A** | Lightweight HTTP research peer (`a2a_research/`, opt-in) |
@@ -337,17 +340,28 @@ PYTHONPATH=src python -m shorts_assistant "LangGraph A2A research"
 
 If the peer is down: degrade to empty research (log `a2a_research_degraded`) unless `A2A_RESEARCH_REQUIRED=true`. Offline eval forces A2A off.
 
-## Async API + worker (Phase 16)
+## Async API + worker (Phase 16 / 24)
 
-Non-blocking job API (no Kubernetes). `POST /shorts` returns **202** immediately; a same-repo worker claims SQL jobs and runs/resumes LangGraph.
+Non-blocking job API (no Kubernetes). `POST /shorts` returns **202** immediately; a same-repo **worker** claims SQL jobs and runs/resumes LangGraph. The API does **not** run the graph in-request.
 
 **Full endpoint + Postman guide:** [`docs/runbooks/api.md`](docs/runbooks/api.md)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/shorts` | Enqueue a run (unique `Idempotency-Key` per new topic) |
+| `GET` | `/shorts` | List this API key’s runs |
+| `GET` | `/shorts/{id}` | Status + **`agents`** pipeline (poll while running) |
+| `GET` | `/shorts/{id}/result` | Research, eval scores, script, visuals, concept, HITL meta |
+| `POST` | `/shorts/{id}/approve` | HITL approve (worker resumes) |
+| `POST` | `/shorts/{id}/revise` | HITL reject / request_changes |
+
+Auth: `X-API-Key` or `Bearer`. Health: `/healthz`, `/readyz` (no auth). CORS: `CORS_ORIGINS` (default Vite `5173`).
 
 ```bash
 export API_KEY=dev-change-me
 export PYTHONPATH=src
 
-# Terminal 1 — API
+# Terminal 1 — API  (one process only; port 8000 cannot be shared)
 python -m shorts_assistant.api --port 8000
 
 # Terminal 2 — worker
@@ -356,7 +370,7 @@ python -m shorts_assistant.worker
 # Client (use a unique Idempotency-Key per new run)
 curl -s -X POST http://127.0.0.1:8000/shorts \
   -H "X-API-Key: $API_KEY" \
-  -H "Idempotency-Key: demo-1" \
+  -H "Idempotency-Key: demo-$(date +%s)" \
   -H "Content-Type: application/json" \
   -d '{"topic":"LangGraph async jobs","hitl_required":false}'
 
@@ -364,7 +378,19 @@ curl -s http://127.0.0.1:8000/shorts/<workflow_id> -H "X-API-Key: $API_KEY"
 curl -s http://127.0.0.1:8000/shorts/<workflow_id>/result -H "X-API-Key: $API_KEY"
 ```
 
-HITL: `POST …/approve` and `POST …/revise` enqueue resume jobs (worker calls `resume_with_decision`).
+`agents` on status/result is the live graph: Research → Memory → Writer → Evaluator → Quality gate → Human review → Visualizer → Formatter (`pending` / `running` / `paused` / `done` / `failed`).
+
+### Web UI (Phase 24)
+
+React + Vite SPA. **Three processes:** API + worker + UI.
+
+```bash
+cd frontend && npm install && npm run dev
+# http://127.0.0.1:5173 — Settings → paste API_KEY → Create
+```
+
+UI pages: Create · History · Run detail (agent pipeline, research, scores, shots, concept, HITL) · Settings.  
+Guide: [`frontend/README.md`](frontend/README.md).
 
 ## GTM accelerator / vertical packs (Phases 22–23)
 
@@ -510,7 +536,7 @@ youtube_shorts_assistant/
 │   ├── hitl.py / approve.py  # interrupt + approve CLI
 │   ├── models/               # ModelRouter + per-task IDs
 │   ├── a2a_research/         # peer Research Agent (A2A-lite)
-│   ├── api/                  # FastAPI job API (202 + healthz/readyz)
+│   ├── api/                  # FastAPI job API + CORS + agent pipeline
 │   ├── worker/               # job poller → LangGraph run/resume
 │   ├── security/             # authz, rate limit, input/output guards
 │   ├── memory/               # RAG retrieve / context / writer
@@ -524,12 +550,13 @@ youtube_shorts_assistant/
 ├── alembic/                  # domain migrations
 ├── evals/                    # smoke + full datasets + packs/
 ├── .github/workflows/        # ci / ai-eval / nightly-eval
+├── frontend/                 # Vite React UI (Phase 24)
 ├── docker-compose.prod.yml   # migrate + api + worker (+ optional postgres)
 ├── docs/runbooks/            # api + deploy + gtm_prototype
 ├── docs/adr/                 # ADR 0001 LangGraph-only
 ├── archive/adk_baseline/     # frozen ADK experiment
 ├── docs/architecture/        # solution architecture + ADK vs LG
-├── docs/plans/               # phases 00–23
+├── docs/plans/               # phases 00–24
 ├── tests/                    # pyramid (see above)
 ├── requirements.txt
 └── requirements-dev.txt
@@ -537,7 +564,7 @@ youtube_shorts_assistant/
 
 ## Learning process
 
-Work follows an inspect → design → **approve** → implement → test loop per phase. Plans live in [`docs/plans/`](docs/plans/). Current local version: **0.23.0**.
+Work follows an inspect → design → **approve** → implement → test loop per phase. Plans live in [`docs/plans/`](docs/plans/). Current local version: **0.24.0**.
 
 ## Out of scope (post-roadmap)
 

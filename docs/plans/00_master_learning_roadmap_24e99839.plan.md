@@ -98,8 +98,8 @@ Cursor must **not** implement the roadmap autonomously.
 | Item | Value |
 |------|--------|
 | **Framework strategy** | LangGraph-only; ADK → archive |
-| **Active phase** | Phase 23 — Live sales_brief pack implemented locally (0.23.0) |
-| **Next step** | Inspect next accelerator phase when ready; push when workflow scope available |
+| **Active phase** | Phase 24 — Web UI + CORS + GET /shorts list (0.24.0) |
+| **Next step** | Commit/push when you ask; or Inspect next phase |
 | **ADK code archived on disk?** | Yes — `archive/adk_baseline/` |
 | **Solution architecture** | [docs/architecture/solution_architecture.md](../architecture/solution_architecture.md) |
 | **Phase 6** | Complete (0.6.0) — taxonomy + scoped LLM retries |

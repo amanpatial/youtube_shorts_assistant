@@ -27,6 +27,7 @@ def test_settings_defaults(monkeypatch):
     assert s.worker_poll_sec == 1.0
     assert s.api_rate_limit_per_min == 30
     assert s.output_policy_enabled is True
+    assert "http://127.0.0.1:5173" in s.cors_origin_list()
 
 
 def test_validate_for_runtime_requires_api_key(monkeypatch):

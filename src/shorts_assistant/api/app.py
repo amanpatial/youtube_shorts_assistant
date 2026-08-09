@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import get_settings
 from ..runtime_lifecycle import is_shutting_down, request_shutdown
@@ -23,6 +24,7 @@ from .schemas import (
     ResultResponse,
     ReviseRequest,
     StatusResponse,
+    WorkflowListResponse,
 )
 from .service import ForbiddenError
 
@@ -39,10 +41,19 @@ def create_app() -> FastAPI:
     """Purpose: build the FastAPI application (uvicorn entry)."""
     app = FastAPI(
         title="YouTube Shorts Assistant API",
-        version="0.23.0",
+        version="0.24.0",
         description="Async job API with authz, rate limits, and guardrails",
         lifespan=_lifespan,
     )
+    origins = get_settings().cors_origin_list()
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     register_health_routes(app)
 
     def _reject_if_draining() -> None:
@@ -77,6 +88,14 @@ def create_app() -> FastAPI:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=safe_api_error(exc)) from exc
         except ForbiddenError as exc:
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=safe_api_error(exc)) from exc
+
+    @app.get("/shorts", response_model=WorkflowListResponse)
+    def list_shorts(
+        auth: AuthContext = Depends(require_api_key),
+        limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> WorkflowListResponse:
+        return service.list_shorts(auth=auth, limit=limit, offset=offset)
 
     @app.get("/shorts/{workflow_id}", response_model=StatusResponse)
     def short_status(

@@ -53,6 +53,20 @@ class WorkflowRepository:
         """Purpose: load workflow by id."""
         return self.session.get(WorkflowRow, uuid.UUID(workflow_id))
 
+    def list_workflows(
+        self,
+        *,
+        owner_key_id: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> list[WorkflowRow]:
+        """Purpose: newest-first workflows for the web UI (owner-scoped)."""
+        stmt = select(WorkflowRow).order_by(WorkflowRow.created_at.desc())
+        if owner_key_id:
+            stmt = stmt.where(WorkflowRow.owner_key_id == owner_key_id)
+        stmt = stmt.offset(max(offset, 0)).limit(max(1, min(limit, 100)))
+        return list(self.session.scalars(stmt).all())
+
     def latest_execution(self, workflow_id: str) -> ExecutionRow | None:
         """Purpose: newest execution for a workflow (HITL / status)."""
         return self.session.scalar(
